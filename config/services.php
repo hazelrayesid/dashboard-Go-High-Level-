@@ -45,4 +45,10 @@ return [
         'timeout' => (int) env('GHL_TIMEOUT', 10),
     ],
 
+    'google_calendar' => [
+        'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID', env('Client_ID')),
+        'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET', env('Client_Secret')),
+        'redirect_uri' => env('GOOGLE_CALENDAR_REDIRECT_URI', rtrim((string) env('APP_URL', 'http://localhost:8000'), '/').'/integrations/google-calendar/callback'),
+    ],
+
 ];

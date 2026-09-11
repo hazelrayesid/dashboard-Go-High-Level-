@@ -19,6 +19,12 @@ class GhlDashboardController extends Controller
         return view('dashboards.company-campaign-control', [
             'dashboard' => $dashboard,
             'dateRange' => $dateRange,
+            'googleCalendar' => [
+                'configured' => filled(config('services.google_calendar.client_id')) && filled(config('services.google_calendar.client_secret')),
+                'connected' => (bool) $request->session()->get('google_calendar.connected', false),
+                'expires_at' => $request->session()->get('google_calendar.expires_at'),
+                'account' => $request->session()->get('google_calendar.account', []),
+            ],
         ]);
     }
 }
