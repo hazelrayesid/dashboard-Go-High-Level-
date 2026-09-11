@@ -32,6 +32,37 @@ class GhlContactPresenter
 
     /**
      * @param  array<string, mixed>  $contact
+     */
+    public function hasDisplayableCompany(array $contact): bool
+    {
+        return $this->present($contact)['business'] !== '-';
+    }
+
+    /**
+     * @param  array<string, mixed>  $contact
+     * @param  array{from?: string|null, to?: string|null}  $dateRange
+     */
+    public function matchesDateRange(array $contact, array $dateRange): bool
+    {
+        if (blank($dateRange['from'] ?? null) && blank($dateRange['to'] ?? null)) {
+            return true;
+        }
+
+        $date = $this->dateOnly((string) (Arr::get($contact, 'dateAdded')
+            ?? Arr::get($contact, 'createdAt')
+            ?? Arr::get($contact, 'created')
+            ?? '-'));
+
+        if ($date === '') {
+            return false;
+        }
+
+        return (blank($dateRange['from'] ?? null) || $date >= $dateRange['from'])
+            && (blank($dateRange['to'] ?? null) || $date <= $dateRange['to']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $contact
      * @return array<string, mixed>
      */
     private function present(array $contact): array

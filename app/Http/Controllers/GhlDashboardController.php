@@ -14,7 +14,7 @@ class GhlDashboardController extends Controller
             'from' => $request->date('from')?->toDateString(),
             'to' => $request->date('to')?->toDateString(),
         ];
-        $dashboard = $campaignDashboard->build();
+        $dashboard = $campaignDashboard->build(dateRange: $dateRange);
 
         return view('dashboards.company-campaign-control', [
             'dashboard' => $dashboard,

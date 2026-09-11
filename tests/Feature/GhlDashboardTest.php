@@ -68,6 +68,33 @@ class GhlDashboardTest extends TestCase
                     ]);
                 }
 
+                if ($tag === 'audit outreach - no website - styled') {
+                    return Http::response([
+                        'contacts' => [
+                            [
+                                'id' => 'hidden_empty_business',
+                                'firstName' => 'Hidden',
+                                'lastName' => 'Empty',
+                                'email' => 'hidden-empty@example.test',
+                                'phone' => '+10000000000',
+                                'dateAdded' => '2026-09-10T02:30:00.000Z',
+                                'tags' => [$tag],
+                            ],
+                            ...collect(range(1, 6))->map(fn (int $index): array => [
+                                'id' => 'replacement_'.$index,
+                                'firstName' => 'Replacement',
+                                'lastName' => (string) $index,
+                                'email' => 'replacement-'.$index.'@example.test',
+                                'phone' => '+1000000000'.$index,
+                                'businessName' => 'Replacement Company '.$index,
+                                'dateAdded' => '2026-09-10T02:30:00.000Z',
+                                'tags' => [$tag],
+                            ])->all(),
+                        ],
+                        'total' => 7,
+                    ]);
+                }
+
                 return Http::response([
                     'contacts' => [
                         [
@@ -97,6 +124,8 @@ class GhlDashboardTest extends TestCase
             ->assertSee('Report opened')
             ->assertSee('Remaining')
             ->assertSee('POC Company')
+            ->assertSee('Replacement Company 6')
+            ->assertDontSee('Hidden Empty')
             ->assertSee('Remaining Empty Company')
             ->assertDontSee('Plain, Top4 signup')
             ->assertDontSee('Remaining Filled Company');
@@ -107,7 +136,7 @@ class GhlDashboardTest extends TestCase
             && $request->data() === [
                 'locationId' => 'loc_123',
                 'page' => 1,
-                'pageLimit' => 6,
+                'pageLimit' => 100,
                 'filters' => [
                     [
                         'field' => 'tags',
@@ -131,5 +160,74 @@ class GhlDashboardTest extends TestCase
                     'value' => '',
                 ],
             ]);
+    }
+
+    public function test_date_range_loads_matching_samples_on_the_server(): void
+    {
+        $this->withoutVite();
+
+        config([
+            'services.ghl.base_url' => 'https://services.leadconnectorhq.com',
+            'services.ghl.access_token' => 'fake-token',
+            'services.ghl.version' => '2021-07-28',
+            'services.ghl.company_id' => null,
+            'services.ghl.location_id' => 'loc_123',
+            'services.ghl.audit_report_url_field_id' => 'audit_field_123',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://services.leadconnectorhq.com/contacts/search' => function ($request) {
+                $filters = $request->data()['filters'];
+
+                if (collect($filters)->contains(fn (array $filter): bool => $filter['field'] === 'customFields.audit_field_123')) {
+                    return Http::response([
+                        'contacts' => [],
+                        'total' => 0,
+                    ]);
+                }
+
+                return Http::response([
+                    'contacts' => [
+                        [
+                            'id' => 'old_contact',
+                            'firstName' => 'Old',
+                            'lastName' => 'Contact',
+                            'email' => 'old@example.test',
+                            'businessName' => 'Old Company',
+                            'dateAdded' => '2026-09-09T12:00:00.000Z',
+                            'tags' => [$filters[0]['value']],
+                        ],
+                        [
+                            'id' => 'matching_contact',
+                            'firstName' => 'Matching',
+                            'lastName' => 'Contact',
+                            'email' => 'matching@example.test',
+                            'businessName' => 'In Range Company',
+                            'dateAdded' => '2026-09-10T12:00:00.000Z',
+                            'tags' => [$filters[0]['value']],
+                        ],
+                    ],
+                    'total' => 2,
+                ]);
+            },
+        ]);
+
+        $response = $this->get('/?from=2026-09-10&to=2026-09-10');
+
+        $response
+            ->assertOk()
+            ->assertSee('In Range Company')
+            ->assertDontSee('Old Company');
+
+        Http::assertSent(fn ($request): bool => collect($request->data()['filters'] ?? [])
+            ->contains(fn (array $filter): bool => $filter === [
+                'field' => 'dateAdded',
+                'operator' => 'range',
+                'value' => [
+                    'gte' => '2026-09-10T00:00:00.000000Z',
+                    'lte' => '2026-09-10T23:59:59.999999Z',
+                ],
+            ]));
     }
 }
