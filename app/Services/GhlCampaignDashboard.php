@@ -24,7 +24,7 @@ class GhlCampaignDashboard
                 'ok' => false,
                 'status' => null,
                 'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN dan GHL_LOCATION_ID harus diset di environment.',
+                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
                 'groups' => $this->segments->emptyGroups(),
                 'totals' => [
                     'contacts' => 0,
@@ -58,7 +58,7 @@ class GhlCampaignDashboard
             'status' => $state['status'],
             'data' => null,
             'error' => $state['successful'] > 0 && $state['failed'] > 0
-                ? 'Sebagian segment belum berhasil dibaca dari HighLevel.'
+                ? 'Some segments could not be read from HighLevel.'
                 : $state['error'],
             'groups' => $state['groups'],
             'totals' => [

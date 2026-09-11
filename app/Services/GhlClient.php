@@ -23,7 +23,7 @@ class GhlClient
                 'ok' => false,
                 'status' => null,
                 'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN dan GHL_LOCATION_ID harus diset di environment.',
+                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
             ];
         }
 
@@ -140,7 +140,7 @@ class GhlClient
                 'ok' => false,
                 'status' => null,
                 'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN dan GHL_LOCATION_ID harus diset di environment.',
+                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
             ];
         }
 
@@ -169,7 +169,7 @@ class GhlClient
                 'ok' => false,
                 'status' => null,
                 'data' => null,
-                'error' => 'Tidak bisa terhubung ke HighLevel. Cek koneksi, base URL, atau firewall lokal.',
+                'error' => 'Unable to connect to HighLevel. Check the connection, base URL, or local firewall.',
             ];
         }
 
@@ -210,10 +210,10 @@ class GhlClient
     private function safeErrorMessage(int $status): string
     {
         return match ($status) {
-            401 => 'Token ditolak oleh HighLevel. Rotasi token jika ragu, lalu update GHL_ACCESS_TOKEN.',
-            403 => 'Token valid, tapi scope belum cukup untuk membaca contacts atau locationId tidak cocok.',
-            429 => 'HighLevel membatasi request sementara. Coba lagi nanti.',
-            default => 'HighLevel mengembalikan error. Detail respons disembunyikan agar token/data sensitif tidak bocor.',
+            401 => 'HighLevel rejected the token. Rotate the token if needed, then update GHL_ACCESS_TOKEN.',
+            403 => 'The token is valid, but it does not have enough scope to read contacts or the locationId does not match.',
+            429 => 'HighLevel is temporarily rate limiting requests. Try again later.',
+            default => 'HighLevel returned an error. Response details are hidden to avoid exposing sensitive token or data.',
         };
     }
 }

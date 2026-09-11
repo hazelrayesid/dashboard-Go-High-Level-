@@ -43,7 +43,7 @@ class GhlContactPresenter
 
         return [
             'id' => (string) Arr::get($contact, 'id', ''),
-            'name' => trim((string) Arr::get($contact, 'firstName', '').' '.(string) Arr::get($contact, 'lastName', '')) ?: (string) Arr::get($contact, 'contactName', 'Tanpa nama'),
+            'name' => trim((string) Arr::get($contact, 'firstName', '').' '.(string) Arr::get($contact, 'lastName', '')) ?: (string) Arr::get($contact, 'contactName', 'Unnamed'),
             'email' => (string) Arr::get($contact, 'email', '-'),
             'phone' => (string) Arr::get($contact, 'phone', '-'),
             'business' => (string) (Arr::get($contact, 'businessName')
