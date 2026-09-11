@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class GhlClient
@@ -174,8 +175,14 @@ class GhlClient
             'pageLimit' => min(max($limit, 1), 100),
             'filters' => $filters,
         ];
+        $cacheKey = $this->cacheKey($payload);
+        if ($cached = $this->cachedResponse($cacheKey, 60)) {
+            return $cached;
+        }
+
         $configuredTimeout = max((int) config('services.ghl.timeout'), 1);
         $requestTimeout = min(max($timeout ?? $configuredTimeout, 1), $configuredTimeout);
+        $retryAttempts = $requestTimeout >= 5 ? 2 : 1;
 
         try {
             $response = Http::baseUrl((string) config('services.ghl.base_url'))
@@ -185,10 +192,15 @@ class GhlClient
                 ->withHeaders([
                     'Version' => (string) config('services.ghl.version'),
                 ])
-                ->connectTimeout(1)
+                ->connectTimeout(min(3, $requestTimeout))
+                ->retry($retryAttempts, 250, throw: false)
                 ->timeout($requestTimeout)
                 ->post('/contacts/search', $payload);
         } catch (ConnectionException) {
+            if ($cached = $this->cachedResponse($cacheKey)) {
+                return $cached;
+            }
+
             return [
                 'ok' => false,
                 'status' => null,
@@ -198,6 +210,10 @@ class GhlClient
         }
 
         if ($response->failed()) {
+            if ($this->shouldUseCachedResponse($response->status()) && $cached = $this->cachedResponse($cacheKey)) {
+                return $cached;
+            }
+
             return [
                 'ok' => false,
                 'status' => $response->status(),
@@ -206,10 +222,17 @@ class GhlClient
             ];
         }
 
+        $data = $response->json();
+        Cache::put($cacheKey, [
+            'stored_at' => time(),
+            'status' => $response->status(),
+            'data' => is_array($data) ? $data : [],
+        ], now()->addMinutes(5));
+
         return [
             'ok' => true,
             'status' => $response->status(),
-            'data' => $response->json(),
+            'data' => is_array($data) ? $data : [],
             'error' => null,
         ];
     }
@@ -287,6 +310,46 @@ class GhlClient
                 'value' => $value,
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function cacheKey(array $payload): string
+    {
+        return 'ghl:contacts-search:'.hash('sha256', json_encode([
+            'base_url' => config('services.ghl.base_url'),
+            'version' => config('services.ghl.version'),
+            'payload' => $payload,
+        ]));
+    }
+
+    /**
+     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}|null
+     */
+    private function cachedResponse(string $cacheKey, ?int $maxAge = null): ?array
+    {
+        $cached = Cache::get($cacheKey);
+
+        if (! is_array($cached)) {
+            return null;
+        }
+
+        if ($maxAge !== null && time() - (int) Arr::get($cached, 'stored_at', 0) > $maxAge) {
+            return null;
+        }
+
+        return [
+            'ok' => true,
+            'status' => Arr::get($cached, 'status'),
+            'data' => Arr::get($cached, 'data', []),
+            'error' => null,
+        ];
+    }
+
+    private function shouldUseCachedResponse(int $status): bool
+    {
+        return $status === 429 || $status >= 500;
     }
 
     private function safeErrorMessage(int $status): string

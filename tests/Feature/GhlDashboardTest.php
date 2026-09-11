@@ -2,11 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\Services\GhlClient;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class GhlDashboardTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::flush();
+    }
+
     public function test_dashboard_renders_company_campaign_segments_from_ghl_tags(): void
     {
         $this->withoutVite();
@@ -229,5 +239,49 @@ class GhlDashboardTest extends TestCase
                     'lte' => '2026-09-10T23:59:59.999999Z',
                 ],
             ]));
+    }
+
+    public function test_ghl_client_uses_recent_cache_when_connection_times_out(): void
+    {
+        config([
+            'services.ghl.base_url' => 'https://services.leadconnectorhq.com',
+            'services.ghl.access_token' => 'fake-token',
+            'services.ghl.version' => '2021-07-28',
+            'services.ghl.location_id' => 'loc_123',
+            'services.ghl.timeout' => 6,
+        ]);
+
+        Cache::flush();
+        Http::preventStrayRequests();
+
+        $attempt = 0;
+        Http::fake([
+            'https://services.leadconnectorhq.com/contacts/search' => function () use (&$attempt) {
+                $attempt++;
+
+                if ($attempt === 1) {
+                    return Http::response([
+                        'contacts' => [
+                            [
+                                'id' => 'cached_contact',
+                                'businessName' => 'Cached Company',
+                            ],
+                        ],
+                        'total' => 1,
+                    ]);
+                }
+
+                throw new ConnectionException('Connection timed out.');
+            },
+        ]);
+
+        $client = app(GhlClient::class);
+        $liveResult = $client->contactsByTag('cached tag', 1, 6);
+        $cachedResult = $client->contactsByTag('cached tag', 1, 6);
+
+        $this->assertTrue($liveResult['ok']);
+        $this->assertTrue($cachedResult['ok']);
+        $this->assertSame('Cached Company', data_get($cachedResult, 'data.contacts.0.businessName'));
+        $this->assertSame(1, data_get($cachedResult, 'data.total'));
     }
 }

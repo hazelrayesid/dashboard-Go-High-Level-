@@ -4,9 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Company Campaign Control</title>
+    <script>
+        const theme = window.localStorage.getItem('companyDashboard.theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        document.documentElement.classList.toggle('dark', theme ? theme === 'dark' : prefersDark);
+    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-[#f5f7fa] font-sans text-slate-950 antialiased">
+<body class="bg-[#f5f7fa] font-sans text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100">
     @php
         $groups = $dashboard['groups'];
         $totals = $dashboard['totals'];

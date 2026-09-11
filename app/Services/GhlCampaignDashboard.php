@@ -3,10 +3,11 @@
 namespace App\Services;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 
 class GhlCampaignDashboard
 {
-    private const DashboardRequestTimeout = 2;
+    private const DashboardRequestTimeout = 4;
 
     private const SamplePageLimit = 100;
 
@@ -39,6 +40,13 @@ class GhlCampaignDashboard
             ];
         }
 
+        $cacheKey = $this->cacheKey($sampleLimit, $dateRange);
+        $cached = Cache::get($cacheKey);
+
+        if (is_array($cached) && time() - (int) Arr::get($cached, 'stored_at', 0) <= 60) {
+            return Arr::get($cached, 'dashboard');
+        }
+
         $state = [
             'groups' => [],
             'successful' => 0,
@@ -57,7 +65,7 @@ class GhlCampaignDashboard
             }
         }
 
-        return [
+        $dashboard = [
             'ok' => $state['successful'] > 0,
             'status' => $state['status'],
             'data' => null,
@@ -72,6 +80,17 @@ class GhlCampaignDashboard
                 'failed_segments' => $state['failed'],
             ],
         ];
+
+        if ($dashboard['ok']) {
+            Cache::put($cacheKey, [
+                'stored_at' => time(),
+                'dashboard' => $dashboard,
+            ], now()->addMinutes(10));
+        } elseif (is_array($cached)) {
+            return Arr::get($cached, 'dashboard', $dashboard);
+        }
+
+        return $dashboard;
     }
 
     /**
@@ -186,5 +205,16 @@ class GhlCampaignDashboard
             ],
             'error' => null,
         ];
+    }
+
+    /**
+     * @param  array{from?: string|null, to?: string|null}  $dateRange
+     */
+    private function cacheKey(int $sampleLimit, array $dateRange): string
+    {
+        return 'ghl:dashboard:'.hash('sha256', json_encode([
+            'sample_limit' => $sampleLimit,
+            'date_range' => $dateRange,
+        ]));
     }
 }

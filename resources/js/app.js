@@ -109,6 +109,17 @@ const setSidebarCollapsed = (isCollapsed) => {
     window.localStorage.setItem('companyDashboard.sidebarCollapsed', String(isCollapsed));
 };
 
+const applyTheme = (theme) => {
+    const isDark = theme === 'dark';
+    const lightIcon = document.querySelector('[data-theme-light-icon]');
+    const darkIcon = document.querySelector('[data-theme-dark-icon]');
+
+    document.documentElement.classList.toggle('dark', isDark);
+    lightIcon?.classList.toggle('hidden', isDark);
+    darkIcon?.classList.toggle('hidden', ! isDark);
+    window.localStorage.setItem('companyDashboard.theme', theme);
+};
+
 document.querySelectorAll('[data-filter-button]').forEach((button) => {
     button.addEventListener('click', () => applyFilter(button.dataset.filterButton ?? 'all'));
 });
@@ -118,6 +129,12 @@ document.querySelectorAll('[data-sidebar-toggle]').forEach((button) => {
         const isCollapsed = button.getAttribute('aria-expanded') === 'true';
 
         setSidebarCollapsed(isCollapsed);
+    });
+});
+
+document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+        applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
     });
 });
 
@@ -138,4 +155,5 @@ document.querySelectorAll('[data-copy-value]').forEach((button) => {
 });
 
 applyFilter('all');
+applyTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 setSidebarCollapsed(window.localStorage.getItem('companyDashboard.sidebarCollapsed') === 'true');
