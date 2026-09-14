@@ -4,28 +4,23 @@ namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class GhlClient
 {
+    public function __construct(private readonly GhlContactDateRange $dateRange) {}
+
     public function isConfigured(): bool
     {
         return filled(config('services.ghl.access_token')) && filled(config('services.ghl.location_id'));
     }
 
-    /**
-     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}
-     */
     public function contactsByTag(string $tag, int $limit = 25, ?int $timeout = null): array
     {
         return $this->contactsByTagPage($tag, $limit, $timeout);
     }
 
-    /**
-     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}
-     */
     public function contactsByTagPage(string $tag, int $limit = 25, ?int $timeout = null, int $page = 1, array $dateRange = []): array
     {
         if (! $this->isConfigured()) {
@@ -43,7 +38,7 @@ class GhlClient
                 'operator' => 'eq',
                 'value' => $tag,
             ],
-        ], $this->dateRangeFilters($dateRange)), $limit, $timeout, $page);
+        ], $this->dateRange->filters($dateRange)), $limit, $timeout, $page);
     }
 
     /**
@@ -68,7 +63,7 @@ class GhlClient
                 'operator' => 'not_eq',
                 'value' => '',
             ],
-        ], $this->dateRangeFilters($dateRange)), 1, $timeout);
+        ], $this->dateRange->filters($dateRange)), 1, $timeout);
 
         if (! $nonEmptyResult['ok']) {
             return $nonEmptyResult;
@@ -125,7 +120,7 @@ class GhlClient
                     'operator' => 'eq',
                     'value' => $tag,
                 ],
-            ], $this->dateRangeFilters($dateRange)), $pageLimit, $timeout, $page);
+            ], $this->dateRange->filters($dateRange)), $pageLimit, $timeout, $page);
             $status ??= $result['status'];
 
             if (! $result['ok']) {
@@ -135,7 +130,7 @@ class GhlClient
             $pageContacts = collect(Arr::get($result, 'data.contacts', []))
                 ->filter(fn (mixed $contact): bool => is_array($contact)
                     && $this->hasEmptyAuditReportUrl($contact)
-                    && $this->matchesDateRange($contact, $dateRange))
+                    && $this->dateRange->matches($contact, $dateRange))
                 ->all();
             $contacts = array_merge($contacts, $pageContacts);
 
@@ -237,9 +232,6 @@ class GhlClient
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $contact
-     */
     private function hasEmptyAuditReportUrl(array $contact): bool
     {
         $fieldId = (string) config('services.ghl.audit_report_url_field_id');
@@ -254,67 +246,6 @@ class GhlClient
         return blank(Arr::get($field, 'value'));
     }
 
-    /**
-     * @param  array<string, mixed>  $contact
-     * @param  array{from?: string|null, to?: string|null}  $dateRange
-     */
-    private function matchesDateRange(array $contact, array $dateRange): bool
-    {
-        if (blank($dateRange['from'] ?? null) && blank($dateRange['to'] ?? null)) {
-            return true;
-        }
-
-        $rawDate = (string) (Arr::get($contact, 'dateAdded')
-            ?? Arr::get($contact, 'createdAt')
-            ?? Arr::get($contact, 'created')
-            ?? '');
-
-        if ($rawDate === '') {
-            return false;
-        }
-
-        try {
-            $date = Carbon::parse($rawDate)->toDateString();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (blank($dateRange['from'] ?? null) || $date >= $dateRange['from'])
-            && (blank($dateRange['to'] ?? null) || $date <= $dateRange['to']);
-    }
-
-    /**
-     * @param  array{from?: string|null, to?: string|null}  $dateRange
-     * @return array<int, array{field: string, operator: string, value: array<string, string>}>
-     */
-    private function dateRangeFilters(array $dateRange): array
-    {
-        if (blank($dateRange['from'] ?? null) && blank($dateRange['to'] ?? null)) {
-            return [];
-        }
-
-        $value = [];
-
-        if (filled($dateRange['from'] ?? null)) {
-            $value['gte'] = Carbon::parse($dateRange['from'])->startOfDay()->toISOString();
-        }
-
-        if (filled($dateRange['to'] ?? null)) {
-            $value['lte'] = Carbon::parse($dateRange['to'])->endOfDay()->toISOString();
-        }
-
-        return [
-            [
-                'field' => 'dateAdded',
-                'operator' => 'range',
-                'value' => $value,
-            ],
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
     private function cacheKey(array $payload): string
     {
         return 'ghl:contacts-search:'.hash('sha256', json_encode([

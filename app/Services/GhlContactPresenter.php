@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
 
 class GhlContactPresenter
 {
+    public function __construct(
+        private readonly GhlContactDateRange $dateRange,
+    ) {}
+
     /**
      * @param  array<string, mixed>|null  $payload
      * @return array<int, array<string, mixed>>
@@ -44,21 +47,7 @@ class GhlContactPresenter
      */
     public function matchesDateRange(array $contact, array $dateRange): bool
     {
-        if (blank($dateRange['from'] ?? null) && blank($dateRange['to'] ?? null)) {
-            return true;
-        }
-
-        $date = $this->dateOnly((string) (Arr::get($contact, 'dateAdded')
-            ?? Arr::get($contact, 'createdAt')
-            ?? Arr::get($contact, 'created')
-            ?? '-'));
-
-        if ($date === '') {
-            return false;
-        }
-
-        return (blank($dateRange['from'] ?? null) || $date >= $dateRange['from'])
-            && (blank($dateRange['to'] ?? null) || $date <= $dateRange['to']);
+        return $this->dateRange->matches($contact, $dateRange);
     }
 
     /**
@@ -83,7 +72,7 @@ class GhlContactPresenter
                 ?? Arr::get($contact, 'website')
                 ?? '-'),
             'created_at' => $createdAt,
-            'created_date' => $this->dateOnly($createdAt),
+            'created_date' => $this->dateRange->dateOnly($createdAt),
             'tags' => collect(Arr::get($contact, 'tags', []))
                 ->filter(fn (mixed $tag): bool => is_scalar($tag))
                 ->map(fn (mixed $tag): string => (string) $tag)
@@ -92,16 +81,4 @@ class GhlContactPresenter
         ];
     }
 
-    private function dateOnly(string $date): string
-    {
-        if ($date === '-') {
-            return '';
-        }
-
-        try {
-            return Carbon::parse($date)->toDateString();
-        } catch (\Throwable) {
-            return '';
-        }
-    }
 }
