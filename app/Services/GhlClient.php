@@ -3,26 +3,15 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Pool;
-use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class GhlClient
 {
-    /**
-     * GHL enforces a burst limit of 100 requests per 10 seconds per token.
-     * A small margin keeps concurrent sync pages clear of 429s and the
-     * multi-second backoff they would trigger.
-     */
-    private const BurstLimit = 80;
-    private const BurstWindowSeconds = 10;
-
-    /** @var array<int, float> Send times of recent requests, shared across instances in this process. */
-    private static array $recentRequests = [];
-
-    public function __construct(private readonly GhlContactDateRange $dateRange) {}
+    public function __construct(
+        private readonly GhlContactDateRange $dateRange,
+        private readonly GhlContactSearchClient $contacts,
+    ) {}
 
     public function isConfigured(): bool
     {
@@ -41,130 +30,16 @@ class GhlClient
         int $page = 1,
         array $dateRange = [],
         bool $useCache = true,
-    ): array
-    {
-        if (! $this->isConfigured()) {
-            return [
-                'ok' => false,
-                'status' => null,
-                'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
-            ];
-        }
-
-        return $this->contactsByFilters(array_merge([
-            [
-                'field' => 'tags',
-                'operator' => 'eq',
-                'value' => $tag,
-            ],
-        ], $this->dateRange->filters($dateRange)), $limit, $timeout, $page, $useCache);
+    ): array {
+        return $this->contacts->byTagPage($tag, $limit, $timeout, $page, $dateRange, $useCache);
     }
 
     /**
-     * Run several tag searches concurrently. Each request is keyed by the
-     * caller and may target its own page and date range. Requests that fail
-     * with a retryable status fall back to the sequential path with backoff,
-     * so a burst of 429s never loses a page.
-     *
      * @param  array<int|string, array{page?: int, dateRange?: array{from?: string|null, to?: string|null}}>  $requests
-     * @return array<int|string, array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}>
      */
     public function contactsByTagBatch(string $tag, int $limit, array $requests, ?int $timeout = null): array
     {
-        if ($requests === []) {
-            return [];
-        }
-
-        if (! $this->isConfigured()) {
-            return array_map(fn (): array => [
-                'ok' => false,
-                'status' => null,
-                'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
-            ], $requests);
-        }
-
-        $filters = [];
-        foreach ($requests as $key => $request) {
-            $filters[$key] = array_merge([
-                [
-                    'field' => 'tags',
-                    'operator' => 'eq',
-                    'value' => $tag,
-                ],
-            ], $this->dateRange->filters($request['dateRange'] ?? []));
-        }
-
-        $configuredTimeout = max((int) config('services.ghl.timeout'), 1);
-        $requestTimeout = min(max($timeout ?? $configuredTimeout, 1), $configuredTimeout);
-        $retryAttempts = $requestTimeout >= 5 ? 2 : 1;
-
-        $this->reserveBurstSlots(count($requests));
-
-        $responses = Http::pool(function (Pool $pool) use ($requests, $filters, $limit, $requestTimeout, $retryAttempts): void {
-            foreach ($requests as $key => $request) {
-                $pool->as((string) $key)
-                    ->baseUrl((string) config('services.ghl.base_url'))
-                    ->acceptJson()
-                    ->asJson()
-                    ->withToken((string) config('services.ghl.access_token'))
-                    ->withHeaders([
-                        'Version' => (string) config('services.ghl.version'),
-                    ])
-                    ->connectTimeout(min(3, $requestTimeout))
-                    ->retry($retryAttempts, 250, throw: false)
-                    ->timeout($requestTimeout)
-                    ->post('/contacts/search', $this->searchPayload($filters[$key], $limit, $request['page'] ?? 1));
-            }
-        });
-
-        $results = [];
-        foreach ($requests as $key => $request) {
-            $response = $responses[(string) $key] ?? null;
-
-            if ($response instanceof Response && ! $response->failed()) {
-                $data = $response->json();
-                $results[$key] = [
-                    'ok' => true,
-                    'status' => $response->status(),
-                    'data' => is_array($data) ? $data : [],
-                    'error' => null,
-                ];
-
-                continue;
-            }
-
-            if ($response instanceof Response && ! $this->shouldRetry($response->status())) {
-                $results[$key] = [
-                    'ok' => false,
-                    'status' => $response->status(),
-                    'data' => null,
-                    'error' => $this->safeErrorMessage($response->status()),
-                ];
-
-                continue;
-            }
-
-            // Connection failure or retryable status: the sequential path sleeps between attempts.
-            $results[$key] = $this->contactsByFilters($filters[$key], $limit, $timeout, $request['page'] ?? 1, false);
-        }
-
-        return $results;
-    }
-
-    /**
-     * @param  array<int, array{field: string, operator: string, value: mixed}>  $filters
-     * @return array<string, mixed>
-     */
-    private function searchPayload(array $filters, int $limit, int $page): array
-    {
-        return [
-            'locationId' => config('services.ghl.location_id'),
-            'page' => max($page, 1),
-            'pageLimit' => min(max($limit, 1), 100),
-            'filters' => $filters,
-        ];
+        return $this->contacts->byTagBatch($tag, $limit, $requests, $timeout);
     }
 
     /**
@@ -173,24 +48,16 @@ class GhlClient
     public function contactById(string $contactId, ?int $timeout = null): array
     {
         if (! $this->isConfigured()) {
-            return [
-                'ok' => false,
-                'status' => null,
-                'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
-            ];
+            return $this->configurationError();
         }
 
-        $configuredTimeout = max((int) config('services.ghl.timeout'), 1);
-        $requestTimeout = min(max($timeout ?? $configuredTimeout, 1), $configuredTimeout);
+        $requestTimeout = $this->requestTimeout($timeout);
 
         try {
             $response = Http::baseUrl((string) config('services.ghl.base_url'))
                 ->acceptJson()
                 ->withToken((string) config('services.ghl.access_token'))
-                ->withHeaders([
-                    'Version' => (string) config('services.ghl.version'),
-                ])
+                ->withHeaders(['Version' => (string) config('services.ghl.version')])
                 ->connectTimeout(min(3, $requestTimeout))
                 ->retry($requestTimeout >= 5 ? 2 : 1, 250, throw: false)
                 ->timeout($requestTimeout)
@@ -234,7 +101,7 @@ class GhlClient
             return $tagResult;
         }
 
-        $nonEmptyResult = $this->contactsByFilters(array_merge([
+        $nonEmptyResult = $this->contacts->byFilters(array_merge([
             [
                 'field' => 'tags',
                 'operator' => 'eq',
@@ -251,18 +118,16 @@ class GhlClient
             return $nonEmptyResult;
         }
 
-        $tagTotal = (int) Arr::get($tagResult, 'data.total', 0);
-        $nonEmptyTotal = (int) Arr::get($nonEmptyResult, 'data.total', 0);
-        $emptyTotal = max($tagTotal - $nonEmptyTotal, 0);
+        $emptyTotal = max(
+            (int) Arr::get($tagResult, 'data.total', 0) - (int) Arr::get($nonEmptyResult, 'data.total', 0),
+            0,
+        );
 
         if ($emptyTotal === 0) {
             return [
                 'ok' => true,
                 'status' => $tagResult['status'] ?? $nonEmptyResult['status'],
-                'data' => [
-                    'contacts' => [],
-                    'total' => 0,
-                ],
+                'data' => ['contacts' => [], 'total' => 0],
                 'error' => null,
             ];
         }
@@ -284,9 +149,6 @@ class GhlClient
         ];
     }
 
-    /**
-     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}
-     */
     private function emptyAuditReportUrlSamplesByTag(string $tag, int $limit, ?int $timeout = null, array $dateRange = []): array
     {
         $contacts = [];
@@ -296,13 +158,7 @@ class GhlClient
         $maxPages = 5;
 
         while (count($contacts) < $limit && $page <= $maxPages) {
-            $result = $this->contactsByFilters(array_merge([
-                [
-                    'field' => 'tags',
-                    'operator' => 'eq',
-                    'value' => $tag,
-                ],
-            ], $this->dateRange->filters($dateRange)), $pageLimit, $timeout, $page);
+            $result = $this->contactsByTagPage($tag, $pageLimit, $timeout, $page, $dateRange);
             $status ??= $result['status'];
 
             if (! $result['ok']) {
@@ -331,133 +187,6 @@ class GhlClient
         ];
     }
 
-    /**
-     * @param  array<int, array{field: string, operator: string, value: mixed}>  $filters
-     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}
-     */
-    private function contactsByFilters(
-        array $filters,
-        int $limit = 25,
-        ?int $timeout = null,
-        int $page = 1,
-        bool $useCache = true,
-    ): array
-    {
-        if (! $this->isConfigured()) {
-            return [
-                'ok' => false,
-                'status' => null,
-                'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
-            ];
-        }
-
-        $payload = $this->searchPayload($filters, $limit, $page);
-        $cacheKey = $this->cacheKey($payload);
-        if ($useCache && $cached = $this->cachedResponse($cacheKey, 60)) {
-            return $cached;
-        }
-
-        $configuredTimeout = max((int) config('services.ghl.timeout'), 1);
-        $requestTimeout = min(max($timeout ?? $configuredTimeout, 1), $configuredTimeout);
-        $retryAttempts = $requestTimeout >= 5 ? 2 : 1;
-
-        $maxAttempts = 8;
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            $this->reserveBurstSlots(1);
-
-            try {
-                $response = Http::baseUrl((string) config('services.ghl.base_url'))
-                    ->acceptJson()
-                    ->asJson()
-                    ->withToken((string) config('services.ghl.access_token'))
-                    ->withHeaders([
-                        'Version' => (string) config('services.ghl.version'),
-                    ])
-                    ->connectTimeout(min(3, $requestTimeout))
-                    ->retry($retryAttempts, 250, throw: false)
-                    ->timeout($requestTimeout)
-                    ->post('/contacts/search', $payload);
-            } catch (ConnectionException) {
-                if ($attempt === $maxAttempts) {
-                    return [
-                        'ok' => false,
-                        'status' => null,
-                        'data' => null,
-                        'error' => 'Unable to connect to HighLevel. Check the connection, base URL, or local firewall.',
-                    ];
-                }
-
-                sleep($this->backoffSeconds($attempt));
-                continue;
-            }
-
-            if (! $response->failed()) {
-                break;
-            }
-
-            if (! $this->shouldRetry($response->status()) || $attempt === $maxAttempts) {
-                if ($useCache && $this->shouldUseCachedResponse($response->status()) && $cached = $this->cachedResponse($cacheKey)) {
-                    return $cached;
-                }
-
-                return [
-                    'ok' => false,
-                    'status' => $response->status(),
-                    'data' => null,
-                    'error' => $this->safeErrorMessage($response->status()),
-                ];
-            }
-
-            sleep($this->retryAfterSeconds($response, $attempt));
-        }
-
-        $data = $response->json();
-        // Full-sync pages are never read back from cache; skipping the write keeps the cache table small.
-        if ($useCache) {
-            Cache::put($cacheKey, [
-                'stored_at' => time(),
-                'status' => $response->status(),
-                'data' => is_array($data) ? $data : [],
-            ], now()->addMinutes(5));
-        }
-
-        return [
-            'ok' => true,
-            'status' => $response->status(),
-            'data' => is_array($data) ? $data : [],
-            'error' => null,
-        ];
-    }
-
-    /**
-     * Block until $count requests fit inside the burst window, then record them.
-     */
-    private function reserveBurstSlots(int $count): void
-    {
-        $count = min(max($count, 1), self::BurstLimit);
-
-        while (true) {
-            $windowStart = microtime(true) - self::BurstWindowSeconds;
-            self::$recentRequests = array_values(array_filter(
-                self::$recentRequests,
-                fn (float $sentAt): bool => $sentAt > $windowStart,
-            ));
-
-            if (count(self::$recentRequests) + $count <= self::BurstLimit) {
-                break;
-            }
-
-            // Sleep until the oldest request in the window expires.
-            usleep((int) max(50_000, (self::$recentRequests[0] - $windowStart) * 1_000_000));
-        }
-
-        $now = microtime(true);
-        for ($i = 0; $i < $count; $i++) {
-            self::$recentRequests[] = $now;
-        }
-    }
-
     private function hasEmptyAuditReportUrl(array $contact): bool
     {
         $fieldId = (string) config('services.ghl.audit_report_url_field_id');
@@ -465,65 +194,24 @@ class GhlClient
             ->first(fn (mixed $customField): bool => is_array($customField)
                 && (string) Arr::get($customField, 'id') === $fieldId);
 
-        if (! is_array($field)) {
-            return true;
-        }
-
-        return blank(Arr::get($field, 'value'));
+        return ! is_array($field) || blank(Arr::get($field, 'value'));
     }
 
-    private function cacheKey(array $payload): string
+    private function requestTimeout(?int $timeout): int
     {
-        return 'ghl:contacts-search:'.hash('sha256', json_encode([
-            'base_url' => config('services.ghl.base_url'),
-            'version' => config('services.ghl.version'),
-            'payload' => $payload,
-        ]));
+        $configuredTimeout = max((int) config('services.ghl.timeout'), 1);
+
+        return min(max($timeout ?? $configuredTimeout, 1), $configuredTimeout);
     }
 
-    /**
-     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}|null
-     */
-    private function cachedResponse(string $cacheKey, ?int $maxAge = null): ?array
+    private function configurationError(): array
     {
-        $cached = Cache::get($cacheKey);
-
-        if (! is_array($cached)) {
-            return null;
-        }
-
-        if ($maxAge !== null && time() - (int) Arr::get($cached, 'stored_at', 0) > $maxAge) {
-            return null;
-        }
-
         return [
-            'ok' => true,
-            'status' => Arr::get($cached, 'status'),
-            'data' => Arr::get($cached, 'data', []),
-            'error' => null,
+            'ok' => false,
+            'status' => null,
+            'data' => null,
+            'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
         ];
-    }
-
-    private function shouldUseCachedResponse(int $status): bool
-    {
-        return $status === 429 || $status >= 500;
-    }
-
-    private function shouldRetry(int $status): bool
-    {
-        return $status === 408 || $status === 429 || $status >= 500;
-    }
-
-    private function backoffSeconds(int $attempt): int
-    {
-        return min(60, max(1, 2 ** min($attempt, 6)));
-    }
-
-    private function retryAfterSeconds(mixed $response, int $attempt): int
-    {
-        $header = (int) $response->header('Retry-After', 0);
-
-        return min(120, max($header, $this->backoffSeconds($attempt)));
     }
 
     private function safeErrorMessage(int $status): string
