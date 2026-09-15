@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\GoogleCalendarEventReader;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -105,5 +106,48 @@ class GoogleCalendarOAuthTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $response->assertSessionHas('google_calendar_error', 'Google Calendar could not be reached from this PHP installation.');
         $this->assertNull(session('google_calendar'));
+    }
+
+    public function test_google_calendar_hides_internal_top4_attendees(): void
+    {
+        $this->withoutVite();
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://www.googleapis.com/calendar/v3/users/me/calendarList*' => Http::response([
+                'items' => [
+                    [
+                        'id' => 'primary',
+                        'summary' => 'Top4 Technology',
+                        'primary' => true,
+                    ],
+                ],
+            ]),
+            'https://www.googleapis.com/calendar/v3/calendars/*/events*' => Http::response([
+                'items' => [
+                    [
+                        'id' => 'event_123',
+                        'summary' => 'Quick meeting and discussion with Chris Timmins',
+                        'start' => ['dateTime' => '2026-09-01T11:00:00+07:00'],
+                        'end' => ['dateTime' => '2026-09-01T11:30:00+07:00'],
+                        'attendees' => [
+                            ['displayName' => 'Michael Doyle', 'email' => 'michael@top4.com.au'],
+                            ['email' => 'marketing@top4.com.au'],
+                            ['email' => 'hello@top4.online'],
+                            ['email' => 'funeral.directors1@outlook.com'],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $state = app(GoogleCalendarEventReader::class)->upcoming(
+            accessToken: 'access-token',
+            month: '2026-09',
+        );
+
+        $this->assertSame(['funeral.directors1@outlook.com'], $state['events'][0]['attendees']);
+        $this->assertSame('funeral.directors1@outlook.com', $state['events'][0]['attendees_title']);
+        $this->assertSame('Calendar', $state['events'][0]['calendar']);
     }
 }

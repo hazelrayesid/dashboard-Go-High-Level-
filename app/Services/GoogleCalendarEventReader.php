@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Http;
 
 class GoogleCalendarEventReader
 {
+    private const InternalAttendeeDomains = ['top4.com.au', 'top4.online'];
+
+    private const InternalAttendeeNames = ['michael doyle'];
+
     private const CALENDAR_LIST_URL = 'https://www.googleapis.com/calendar/v3/users/me/calendarList';
 
     private const EVENTS_BASE_URL = 'https://www.googleapis.com/calendar/v3/calendars';
@@ -155,7 +159,7 @@ class GoogleCalendarEventReader
             'day' => $displayStartsAt->format('D'),
             'date' => $displayStartsAt->format('M j'),
             'time' => isset($event['start']['date']) ? 'All day' : $displayStartsAt->format('H:i').($displayEndsAt ? ' - '.$displayEndsAt->format('H:i') : ''),
-            'calendar' => $calendarTitle,
+            'calendar' => $this->displayCalendarTitle($calendarTitle),
             'attendees' => $attendees,
             'attendees_title' => collect($attendees)->implode(', ') ?: $calendarTitle,
             'link' => $event['htmlLink'] ?? null,
@@ -199,11 +203,40 @@ class GoogleCalendarEventReader
     {
         return collect($event['attendees'] ?? [])
             ->filter(fn (mixed $attendee): bool => is_array($attendee))
+            ->reject(fn (array $attendee): bool => $this->isInternalAttendee($attendee))
             ->map(fn (array $attendee): string => trim((string) ($attendee['displayName'] ?? $attendee['email'] ?? '')))
             ->filter()
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $attendee
+     */
+    private function isInternalAttendee(array $attendee): bool
+    {
+        $email = str((string) ($attendee['email'] ?? ''))->lower()->trim()->toString();
+        $name = str((string) ($attendee['displayName'] ?? ''))->lower()->squish()->toString();
+
+        if (str_contains($email, 'top4') || str_contains($name, 'top4')) {
+            return true;
+        }
+
+        if ($email !== '') {
+            foreach (self::InternalAttendeeDomains as $domain) {
+                if (str_ends_with($email, '@'.$domain)) {
+                    return true;
+                }
+            }
+        }
+
+        return $name !== '' && in_array($name, self::InternalAttendeeNames, true);
+    }
+
+    private function displayCalendarTitle(string $calendarTitle): string
+    {
+        return str_contains(strtolower($calendarTitle), 'top4') ? 'Calendar' : $calendarTitle;
     }
 
     private function isNoiseCalendar(array $calendar): bool
