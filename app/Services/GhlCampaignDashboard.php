@@ -22,7 +22,7 @@ class GhlCampaignDashboard
                 'ok' => false,
                 'status' => null,
                 'data' => null,
-                'error' => 'No HighLevel contacts are synced yet. Run Sync GHL data to load PostgreSQL.',
+                'error' => 'No HighLevel contacts are synced yet. Run Sync GHL data to load the database.',
                 'groups' => $this->segments->emptyGroups(),
                 'totals' => [
                     'contacts' => 0,

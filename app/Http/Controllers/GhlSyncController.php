@@ -26,6 +26,6 @@ class GhlSyncController extends Controller
 
         return redirect()
             ->route('dashboard')
-            ->with('ghl_sync_status', 'HighLevel sync queued. PostgreSQL will update in the background.');
+            ->with('ghl_sync_status', 'HighLevel sync queued. The database will update in the background.');
     }
 }

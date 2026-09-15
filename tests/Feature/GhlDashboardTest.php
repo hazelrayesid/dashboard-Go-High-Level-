@@ -264,7 +264,7 @@ class GhlDashboardTest extends TestCase
 
         $response
             ->assertRedirect(route('dashboard'))
-            ->assertSessionHas('ghl_sync_status', 'HighLevel sync queued. PostgreSQL will update in the background.');
+            ->assertSessionHas('ghl_sync_status', 'HighLevel sync queued. The database will update in the background.');
 
         Queue::assertPushedOn('ghl-sync', SyncGhlContacts::class);
     }

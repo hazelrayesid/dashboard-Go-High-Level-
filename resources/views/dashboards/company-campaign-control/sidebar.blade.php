@@ -61,7 +61,7 @@
         <div class="mt-auto grid gap-2">
             <form method="POST" action="{{ route('ghl.sync') }}">
                 @csrf
-                <button type="submit" title="Run one full GHL sync to PostgreSQL. Automatic batches are handled in the background." class="flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">
+                <button type="submit" title="Run one full GHL sync to the database. Automatic batches are handled in the background." class="flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">
                     <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M21 12a9 9 0 0 1-15.6 6"/>
                         <path d="M3 12A9 9 0 0 1 18.6 6"/>
