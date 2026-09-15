@@ -3,20 +3,13 @@
 namespace App\Services;
 
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Cache;
 
 class GhlCampaignDashboard
 {
-    private const DashboardRequestTimeout = 4;
-
-    private const SamplePageLimit = 100;
-
-    private const SampleMaxPages = 2;
-
     public function __construct(
-        private readonly GhlClient $client,
         private readonly GhlCampaignSegments $segments,
         private readonly GhlContactPresenter $presenter,
+        private readonly GhlContactRepository $contacts,
     ) {}
 
     /**
@@ -24,12 +17,12 @@ class GhlCampaignDashboard
      */
     public function build(int $sampleLimit = 6, array $dateRange = []): array
     {
-        if (! $this->client->isConfigured()) {
+        if (! $this->contacts->hasSyncedContacts()) {
             return [
                 'ok' => false,
                 'status' => null,
                 'data' => null,
-                'error' => 'GHL_ACCESS_TOKEN and GHL_LOCATION_ID must be set in the environment.',
+                'error' => 'No HighLevel contacts are synced yet. Run Sync GHL data to load PostgreSQL.',
                 'groups' => $this->segments->emptyGroups(),
                 'totals' => [
                     'contacts' => 0,
@@ -40,21 +33,11 @@ class GhlCampaignDashboard
             ];
         }
 
-        $cacheKey = $this->cacheKey($sampleLimit, $dateRange);
-        $cached = Cache::get($cacheKey);
-
-        if (is_array($cached) && time() - (int) Arr::get($cached, 'stored_at', 0) <= 60) {
-            return Arr::get($cached, 'dashboard');
-        }
-
         $state = [
             'groups' => [],
-            'successful' => 0,
-            'failed' => 0,
-            'status' => null,
-            'error' => null,
             'contacts' => 0,
             'companies' => 0,
+            'failed' => 0,
         ];
 
         foreach ($this->segments->groups() as $groupName => $groupSegments) {
@@ -65,13 +48,11 @@ class GhlCampaignDashboard
             }
         }
 
-        $dashboard = [
-            'ok' => $state['successful'] > 0,
-            'status' => $state['status'],
+        return [
+            'ok' => true,
+            'status' => null,
             'data' => null,
-            'error' => $state['successful'] > 0 && $state['failed'] > 0
-                ? 'Some segments could not be read from HighLevel.'
-                : $state['error'],
+            'error' => null,
             'groups' => $state['groups'],
             'totals' => [
                 'contacts' => $state['contacts'],
@@ -80,17 +61,6 @@ class GhlCampaignDashboard
                 'failed_segments' => $state['failed'],
             ],
         ];
-
-        if ($dashboard['ok']) {
-            Cache::put($cacheKey, [
-                'stored_at' => time(),
-                'dashboard' => $dashboard,
-            ], now()->addMinutes(10));
-        } elseif (is_array($cached)) {
-            return Arr::get($cached, 'dashboard', $dashboard);
-        }
-
-        return $dashboard;
     }
 
     /**
@@ -100,14 +70,12 @@ class GhlCampaignDashboard
      */
     private function appendSegment(array $state, string $groupName, array $segment, int $sampleLimit, array $dateRange): array
     {
-        $result = $this->segmentResult($segment, $sampleLimit, $dateRange);
+        $result = $this->contacts->segmentResult($segment, $this->segments->tags($segment), $sampleLimit, $dateRange);
         $companies = $this->presenter->companies($result['data']);
 
-        $state['status'] ??= $result['status'];
-        $state[$result['ok'] ? 'successful' : 'failed']++;
-        $state['error'] ??= $result['error'];
         $state['contacts'] += (int) Arr::get($result, 'data.total', 0);
         $state['companies'] += count($companies);
+        $state['failed'] += $result['ok'] ? 0 : 1;
         $state['groups'][$groupName][] = [
             'label' => $segment['label'],
             'tag' => $this->segments->tagLabel($segment),
@@ -119,102 +87,5 @@ class GhlCampaignDashboard
         ];
 
         return $state;
-    }
-
-    /**
-     * @param  array{label: string, tag?: string, tags?: array<int, string>, requires_empty_audit_report_url?: bool}  $segment
-     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}
-     */
-    private function segmentResult(array $segment, int $sampleLimit, array $dateRange): array
-    {
-        $results = collect($this->segments->tags($segment))
-            ->map(fn (string $tag): array => $segment['requires_empty_audit_report_url'] ?? false
-                ? $this->client->contactsByTagWithEmptyAuditReportUrl($tag, self::SamplePageLimit, self::DashboardRequestTimeout, $dateRange)
-                : $this->contactsByTagWithDisplayableSamples($tag, $sampleLimit, $dateRange));
-
-        $successful = $results->filter(fn (array $result): bool => $result['ok']);
-
-        if ($successful->isEmpty()) {
-            return $results->first();
-        }
-
-        return [
-            'ok' => true,
-            'status' => Arr::get($successful->first(), 'status'),
-            'data' => [
-                'contacts' => $successful
-                    ->flatMap(fn (array $result): array => Arr::get($result, 'data.contacts', []))
-                    ->filter(fn (mixed $contact): bool => is_array($contact)
-                        && $this->presenter->hasDisplayableCompany($contact)
-                        && $this->presenter->matchesDateRange($contact, $dateRange))
-                    ->take($sampleLimit)
-                    ->values()
-                    ->all(),
-                'total' => $successful->sum(fn (array $result): int => (int) Arr::get($result, 'data.total', 0)),
-            ],
-            'error' => null,
-        ];
-    }
-
-    /**
-     * @return array{ok: bool, status: int|null, data: array<string, mixed>|null, error: string|null}
-     */
-    private function contactsByTagWithDisplayableSamples(string $tag, int $sampleLimit, array $dateRange): array
-    {
-        $contacts = [];
-        $status = null;
-        $total = 0;
-        $page = 1;
-
-        while (count($contacts) < $sampleLimit && $page <= self::SampleMaxPages) {
-            $result = $this->client->contactsByTagPage($tag, self::SamplePageLimit, self::DashboardRequestTimeout, $page, $dateRange);
-
-            if (! $result['ok']) {
-                return $result;
-            }
-
-            $status ??= $result['status'];
-            $total = (int) Arr::get($result, 'data.total', $total);
-            $pageContacts = collect(Arr::get($result, 'data.contacts', []))
-                ->filter(fn (mixed $contact): bool => is_array($contact))
-                ->values();
-
-            foreach ($pageContacts as $contact) {
-                if ($this->presenter->hasDisplayableCompany($contact) && $this->presenter->matchesDateRange($contact, $dateRange)) {
-                    $contacts[] = $contact;
-                }
-
-                if (count($contacts) >= $sampleLimit) {
-                    break;
-                }
-            }
-
-            if ($pageContacts->count() < self::SamplePageLimit) {
-                break;
-            }
-
-            $page++;
-        }
-
-        return [
-            'ok' => true,
-            'status' => $status,
-            'data' => [
-                'contacts' => array_slice($contacts, 0, $sampleLimit),
-                'total' => $total,
-            ],
-            'error' => null,
-        ];
-    }
-
-    /**
-     * @param  array{from?: string|null, to?: string|null}  $dateRange
-     */
-    private function cacheKey(int $sampleLimit, array $dateRange): string
-    {
-        return 'ghl:dashboard:'.hash('sha256', json_encode([
-            'sample_limit' => $sampleLimit,
-            'date_range' => $dateRange,
-        ]));
     }
 }

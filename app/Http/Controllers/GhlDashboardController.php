@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\CompanyCampaignControlViewData;
 use App\Services\GhlCampaignDashboard;
+use App\Services\GhlSyncStatus;
 use App\Services\GoogleCalendarService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,8 +16,8 @@ class GhlDashboardController extends Controller
         GhlCampaignDashboard $campaignDashboard,
         GoogleCalendarService $googleCalendar,
         CompanyCampaignControlViewData $viewData,
-    ): View
-    {
+        GhlSyncStatus $syncStatus,
+    ): View {
         $dateRange = [
             'from' => $request->date('from')?->toDateString(),
             'to' => $request->date('to')?->toDateString(),
@@ -27,6 +28,7 @@ class GhlDashboardController extends Controller
             dashboard: $dashboard,
             dateRange: $dateRange,
             googleCalendar: $googleCalendar->dashboardState($request),
+            syncStatus: $syncStatus->summary(),
         ));
     }
 }

@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
+
 class CompanyCampaignControlViewData
 {
     /**
      * @param  array<string, mixed>  $dashboard
      * @param  array{from?: string|null, to?: string|null}  $dateRange
      * @param  array<string, mixed>  $googleCalendar
+     * @param  array{pending: int, failed: int, contacts: int, active_contacts: int}  $syncStatus
      * @return array<string, mixed>
      */
-    public function make(array $dashboard, array $dateRange, array $googleCalendar): array
+    public function make(array $dashboard, array $dateRange, array $googleCalendar, array $syncStatus): array
     {
         $groups = $dashboard['groups'];
         $totals = $dashboard['totals'];
@@ -25,6 +28,7 @@ class CompanyCampaignControlViewData
             'dashboard' => $dashboard,
             'dateRange' => $dateRange,
             'googleCalendar' => $googleCalendar,
+            'syncStatus' => $syncStatus,
             'groups' => $groups,
             'totals' => $totals,
             'hasPartialFailure' => $dashboard['ok'] && $totals['failed_segments'] > 0,
@@ -41,14 +45,14 @@ class CompanyCampaignControlViewData
         ];
     }
 
-    private function reportRate(\Illuminate\Support\Collection $groupTotals): float|int
+    private function reportRate(Collection $groupTotals): float|int
     {
         $sentTotal = ($groupTotals['Sent, has website'] ?? 0) + ($groupTotals['Sent, no website'] ?? 0);
 
         return $sentTotal > 0 ? round((($groupTotals['Report opened'] ?? 0) / $sentTotal) * 100, 1) : 0;
     }
 
-    private function companyQueue(\Illuminate\Support\Collection $segments): \Illuminate\Support\Collection
+    private function companyQueue(Collection $segments): Collection
     {
         return $segments
             ->map(fn (array $segment): array => array_merge($segment, [

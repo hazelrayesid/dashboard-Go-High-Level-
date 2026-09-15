@@ -43,12 +43,16 @@ return [
         'location_id' => env('GHL_LOCATION_ID'),
         'audit_report_url_field_id' => env('GHL_AUDIT_REPORT_URL_FIELD_ID', '9T4jIzXW21RYkBzmWoj1'),
         'timeout' => (int) env('GHL_TIMEOUT', 10),
+        // Pages fetched in parallel during a full sync. GHL allows 100 requests per 10 seconds.
+        'sync_concurrency' => (int) env('GHL_SYNC_CONCURRENCY', 10),
+        'webhook_secret' => env('GHL_WEBHOOK_SECRET'),
     ],
 
     'google_calendar' => [
         'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID', env('Client_ID')),
         'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET', env('Client_Secret')),
         'redirect_uri' => env('GOOGLE_CALENDAR_REDIRECT_URI', rtrim((string) env('APP_URL', 'http://localhost:8000'), '/').'/integrations/google-calendar/callback'),
+        'timezone' => env('GOOGLE_CALENDAR_TIMEZONE', 'Asia/Bangkok'),
     ],
 
 ];

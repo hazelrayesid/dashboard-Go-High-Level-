@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -13,13 +12,15 @@ class GoogleCalendarService
 {
     private const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
-    private const EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
-
     private const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
     private const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
-    private const SCOPE = 'openid email profile https://www.googleapis.com/auth/calendar.events.readonly';
+    private const SCOPE = 'openid email profile https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.readonly';
+
+    public function __construct(
+        private readonly GoogleCalendarEventReader $eventReader,
+    ) {}
 
     public function isConfigured(): bool
     {
@@ -133,31 +134,12 @@ class GoogleCalendarService
             return ['events_status' => 'Google Calendar needs to be reconnected before events can be loaded.'];
         }
 
-        try {
-            $response = Http::withToken($accessToken)
-                ->timeout(10)
-                ->get(self::EVENTS_URL, [
-                    'singleEvents' => 'true',
-                    'orderBy' => 'startTime',
-                    'maxResults' => 6,
-                    'timeMin' => now()->toRfc3339String(),
-                    'timeMax' => now()->addDays(30)->toRfc3339String(),
-                ]);
-        } catch (ConnectionException) {
-            return ['events_status' => 'Upcoming events could not be reached right now.'];
-        }
-
-        if ($response->failed()) {
-            return ['events_status' => 'Upcoming events could not be loaded from Google Calendar.'];
-        }
-
-        return [
-            'events' => collect($response->json('items', []))
-                ->map(fn (array $event): ?array => $this->formatEvent($event))
-                ->filter()
-                ->values()
-                ->all(),
-        ];
+        return $this->eventReader->upcoming(
+            accessToken: $accessToken,
+            month: $request->query('calendar_month'),
+            date: $request->query('calendar_date'),
+            page: max((int) $request->query('calendar_page', 1), 1),
+        );
     }
 
     private function validAccessToken(Request $request): ?string
@@ -259,28 +241,4 @@ class GoogleCalendarService
             : collect($response->json())->only(['name', 'email', 'picture'])->filter()->all();
     }
 
-    private function formatEvent(array $event): ?array
-    {
-        $start = $event['start']['dateTime'] ?? $event['start']['date'] ?? null;
-
-        if (blank($start)) {
-            return null;
-        }
-
-        $startsAt = Carbon::parse($start);
-        $end = $event['end']['dateTime'] ?? $event['end']['date'] ?? null;
-        $endsAt = filled($end) ? Carbon::parse($end) : null;
-
-        return [
-            'title' => $event['summary'] ?? 'Untitled calendar event',
-            'date_key' => $startsAt->toDateString(),
-            'day' => $startsAt->format('D'),
-            'date' => $startsAt->format('M j'),
-            'time' => isset($event['start']['date']) ? 'All day' : $startsAt->format('H:i').($endsAt ? ' - '.$endsAt->format('H:i') : ''),
-            'calendar' => $event['organizer']['displayName'] ?? $event['organizer']['email'] ?? 'Primary calendar',
-            'link' => $event['htmlLink'] ?? null,
-            'meeting_link' => $event['hangoutLink'] ?? null,
-            'status' => $event['status'] ?? 'confirmed',
-        ];
-    }
 }

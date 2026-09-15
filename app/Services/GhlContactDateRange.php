@@ -43,11 +43,17 @@ class GhlContactDateRange
         $value = [];
 
         if (filled($dateRange['from'] ?? null)) {
-            $value['gte'] = Carbon::parse($dateRange['from'])->startOfDay()->toISOString();
+            $from = Carbon::parse($dateRange['from']);
+            $value['gte'] = str_contains((string) $dateRange['from'], 'T')
+                ? $from->toISOString()
+                : $from->startOfDay()->toISOString();
         }
 
         if (filled($dateRange['to'] ?? null)) {
-            $value['lte'] = Carbon::parse($dateRange['to'])->endOfDay()->toISOString();
+            $to = Carbon::parse($dateRange['to']);
+            $value['lte'] = str_contains((string) $dateRange['to'], 'T')
+                ? $to->toISOString()
+                : $to->endOfDay()->toISOString();
         }
 
         return [

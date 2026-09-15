@@ -2,10 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ProcessGhlContactWebhook;
+use App\Jobs\SyncGhlContacts;
 use App\Services\GhlClient;
+use App\Services\GhlContactRepository;
+use App\Services\GhlSyncStatus;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class GhlDashboardTest extends TestCase
@@ -15,11 +20,13 @@ class GhlDashboardTest extends TestCase
         parent::setUp();
 
         Cache::flush();
+        $this->bindSyncStatus();
     }
 
     public function test_dashboard_renders_company_campaign_segments_from_ghl_tags(): void
     {
         $this->withoutVite();
+        $this->bindDashboardContacts();
 
         config([
             'services.ghl.base_url' => 'https://services.leadconnectorhq.com',
@@ -140,41 +147,13 @@ class GhlDashboardTest extends TestCase
             ->assertDontSee('Plain, Top4 signup')
             ->assertDontSee('Remaining Filled Company');
 
-        Http::assertSent(fn ($request): bool => $request->method() === 'POST'
-            && $request->url() === 'https://services.leadconnectorhq.com/contacts/search'
-            && $request->hasHeader('Authorization', 'Bearer fake-token')
-            && $request->data() === [
-                'locationId' => 'loc_123',
-                'page' => 1,
-                'pageLimit' => 100,
-                'filters' => [
-                    [
-                        'field' => 'tags',
-                        'operator' => 'eq',
-                        'value' => 'audit outreach - has website - plain',
-                    ],
-                ],
-            ]);
-
-        Http::assertSent(fn ($request): bool => $request->method() === 'POST'
-            && $request->url() === 'https://services.leadconnectorhq.com/contacts/search'
-            && $request->data()['filters'] === [
-                [
-                    'field' => 'tags',
-                    'operator' => 'eq',
-                    'value' => 'top4 signup',
-                ],
-                [
-                    'field' => 'customFields.audit_field_123',
-                    'operator' => 'not_eq',
-                    'value' => '',
-                ],
-            ]);
+        Http::assertNothingSent();
     }
 
     public function test_date_range_loads_matching_samples_on_the_server(): void
     {
         $this->withoutVite();
+        $this->bindDashboardContacts();
 
         config([
             'services.ghl.base_url' => 'https://services.leadconnectorhq.com',
@@ -230,15 +209,7 @@ class GhlDashboardTest extends TestCase
             ->assertSee('In Range Company')
             ->assertDontSee('Old Company');
 
-        Http::assertSent(fn ($request): bool => collect($request->data()['filters'] ?? [])
-            ->contains(fn (array $filter): bool => $filter === [
-                'field' => 'dateAdded',
-                'operator' => 'range',
-                'value' => [
-                    'gte' => '2026-09-10T00:00:00.000000Z',
-                    'lte' => '2026-09-10T23:59:59.999999Z',
-                ],
-            ]));
+        Http::assertNothingSent();
     }
 
     public function test_ghl_client_uses_recent_cache_when_connection_times_out(): void
@@ -283,5 +254,165 @@ class GhlDashboardTest extends TestCase
         $this->assertTrue($cachedResult['ok']);
         $this->assertSame('Cached Company', data_get($cachedResult, 'data.contacts.0.businessName'));
         $this->assertSame(1, data_get($cachedResult, 'data.total'));
+    }
+
+    public function test_ghl_sync_request_queues_background_job(): void
+    {
+        Queue::fake();
+
+        $response = $this->post('/ghl/sync');
+
+        $response
+            ->assertRedirect(route('dashboard'))
+            ->assertSessionHas('ghl_sync_status', 'HighLevel sync queued. PostgreSQL will update in the background.');
+
+        Queue::assertPushedOn('ghl-sync', SyncGhlContacts::class);
+    }
+
+    public function test_ghl_webhook_queues_contact_processing_job(): void
+    {
+        Queue::fake();
+        config(['services.ghl.webhook_secret' => 'webhook-secret']);
+
+        $response = $this->postJson('/webhooks/ghl', [
+            'type' => 'ContactUpdate',
+            'contact' => [
+                'id' => 'contact_123',
+                'email' => 'team@example.test',
+            ],
+        ], [
+            'X-GHL-Webhook-Secret' => 'webhook-secret',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJson(['message' => 'GHL webhook accepted.']);
+
+        Queue::assertPushedOn('ghl-sync', ProcessGhlContactWebhook::class);
+    }
+
+    public function test_ghl_webhook_rejects_invalid_secret(): void
+    {
+        Queue::fake();
+        config(['services.ghl.webhook_secret' => 'webhook-secret']);
+
+        $response = $this->postJson('/webhooks/ghl', [
+            'type' => 'ContactUpdate',
+            'contact' => ['id' => 'contact_123'],
+        ], [
+            'X-GHL-Webhook-Secret' => 'wrong-secret',
+        ]);
+
+        $response->assertUnauthorized();
+        Queue::assertNothingPushed();
+    }
+
+    private function bindDashboardContacts(): void
+    {
+        $this->app->instance(GhlContactRepository::class, new class extends GhlContactRepository
+        {
+            public function hasSyncedContacts(): bool
+            {
+                return true;
+            }
+
+            public function segmentResult(array $segment, array $tags, int $sampleLimit, array $dateRange): array
+            {
+                $contacts = match ($segment['label']) {
+                    'Styled' => $this->styledNoWebsiteContacts($tags[0]),
+                    'Top4 signup' => [$this->remainingEmptyContact($tags[0])],
+                    default => [$this->pocContact($tags[0])],
+                };
+
+                if (($dateRange['from'] ?? null) === '2026-09-10') {
+                    $contacts = [$this->matchingContact($tags[0])];
+                }
+
+                return [
+                    'ok' => true,
+                    'status' => null,
+                    'data' => [
+                        'contacts' => array_slice($contacts, 0, $sampleLimit),
+                        'total' => count($contacts),
+                    ],
+                    'error' => null,
+                ];
+            }
+
+            private function pocContact(string $tag): array
+            {
+                return [
+                    'id' => 'contact_123',
+                    'firstName' => 'POC',
+                    'lastName' => 'Contact',
+                    'email' => 'team@example.test',
+                    'phone' => '+10000000000',
+                    'businessName' => 'POC Company',
+                    'dateAdded' => '2026-09-10T02:30:00.000Z',
+                    'tags' => [$tag],
+                ];
+            }
+
+            private function styledNoWebsiteContacts(string $tag): array
+            {
+                return [
+                    ...collect(range(1, 6))->map(fn (int $index): array => [
+                        'id' => 'replacement_'.$index,
+                        'firstName' => 'Replacement',
+                        'lastName' => (string) $index,
+                        'email' => 'replacement-'.$index.'@example.test',
+                        'phone' => '+1000000000'.$index,
+                        'businessName' => 'Replacement Company '.$index,
+                        'dateAdded' => '2026-09-10T02:30:00.000Z',
+                        'tags' => [$tag],
+                    ])->all(),
+                    ['id' => 'hidden_empty_business', 'firstName' => 'Hidden', 'lastName' => 'Empty', 'email' => 'hidden-empty@example.test', 'dateAdded' => '2026-09-10T02:30:00.000Z', 'tags' => [$tag]],
+                ];
+            }
+
+            private function remainingEmptyContact(string $tag): array
+            {
+                return [
+                    'id' => 'remaining_empty',
+                    'firstName' => 'Remaining',
+                    'lastName' => 'Empty',
+                    'email' => 'remaining-empty@example.test',
+                    'phone' => '+10000000001',
+                    'businessName' => 'Remaining Empty Company',
+                    'dateAdded' => '2026-09-10T02:30:00.000Z',
+                    'tags' => [$tag],
+                    'customFields' => [],
+                ];
+            }
+
+            private function matchingContact(string $tag): array
+            {
+                return [
+                    'id' => 'matching_contact',
+                    'firstName' => 'Matching',
+                    'lastName' => 'Contact',
+                    'email' => 'matching@example.test',
+                    'businessName' => 'In Range Company',
+                    'dateAdded' => '2026-09-10T12:00:00.000Z',
+                    'tags' => [$tag],
+                ];
+            }
+        });
+    }
+
+    private function bindSyncStatus(): void
+    {
+        $this->app->instance(GhlSyncStatus::class, new class extends GhlSyncStatus
+        {
+            public function summary(): array
+            {
+                return [
+                    'pending' => 0,
+                    'failed' => 0,
+                    'contacts' => 0,
+                    'active_contacts' => 0,
+                ];
+            }
+        });
     }
 }
