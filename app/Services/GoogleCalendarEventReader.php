@@ -150,6 +150,7 @@ class GoogleCalendarEventReader
         $displayStartsAt = $this->displayTime($startsAt);
         $displayEndsAt = $endsAt ? $this->displayTime($endsAt) : null;
         $attendees = $this->attendees($event);
+        $attendeeLabels = collect($attendees)->pluck('label')->all();
 
         return [
             'title' => $title,
@@ -160,8 +161,9 @@ class GoogleCalendarEventReader
             'date' => $displayStartsAt->format('M j'),
             'time' => isset($event['start']['date']) ? 'All day' : $displayStartsAt->format('H:i').($displayEndsAt ? ' - '.$displayEndsAt->format('H:i') : ''),
             'calendar' => $this->displayCalendarTitle($calendarTitle),
-            'attendees' => $attendees,
-            'attendees_title' => collect($attendees)->implode(', ') ?: $calendarTitle,
+            'attendees' => $attendeeLabels,
+            'attendee_people' => $attendees,
+            'attendees_title' => collect($attendeeLabels)->implode(', ') ?: $calendarTitle,
             'link' => $event['htmlLink'] ?? null,
             'meeting_link' => $event['hangoutLink'] ?? null,
             'status' => $event['status'] ?? 'confirmed',
@@ -197,16 +199,19 @@ class GoogleCalendarEventReader
     }
 
     /**
-     * @return array<int, string>
+     * @return array<int, array{label: string, email: string|null}>
      */
     private function attendees(array $event): array
     {
         return collect($event['attendees'] ?? [])
             ->filter(fn (mixed $attendee): bool => is_array($attendee))
             ->reject(fn (array $attendee): bool => $this->isInternalAttendee($attendee))
-            ->map(fn (array $attendee): string => trim((string) ($attendee['displayName'] ?? $attendee['email'] ?? '')))
-            ->filter()
-            ->unique()
+            ->map(fn (array $attendee): array => [
+                'label' => trim((string) ($attendee['displayName'] ?? $attendee['email'] ?? '')),
+                'email' => filled($attendee['email'] ?? null) ? strtolower(trim((string) $attendee['email'])) : null,
+            ])
+            ->filter(fn (array $attendee): bool => $attendee['label'] !== '')
+            ->unique(fn (array $attendee): string => $attendee['email'] ?: $attendee['label'])
             ->values()
             ->all();
     }

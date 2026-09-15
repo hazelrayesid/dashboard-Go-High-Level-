@@ -12,6 +12,7 @@
     $eventsLastPage = $googleCalendar['events_last_page'] ?? 1;
     $eventsPerPage = $googleCalendar['events_per_page'] ?? 6;
     $selectedDate = $googleCalendar['calendar_selected_date'] ?? null;
+    $emailCompare = $googleCalendar['calendar_email_compare'] ?? ['checked' => 0, 'matched' => 0, 'unmatched' => 0, 'available' => true];
 @endphp
 
 <section class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -117,6 +118,9 @@
                             <h4 class="text-sm font-semibold text-slate-950 dark:text-white">Upcoming from Google Calendar</h4>
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                 {{ $selectedDate ? ($googleCalendar['calendar_selected_date_label'] ?? $selectedDate) : $calendarMonth->format('F Y') }} &middot; {{ $eventsTotal }} unique events
+                                @if (($emailCompare['available'] ?? true) && ($emailCompare['checked'] ?? 0) > 0)
+                                    &middot; {{ $emailCompare['matched'] }} in GHL &middot; {{ $emailCompare['unmatched'] }} new
+                                @endif
                             </p>
                         </div>
                         <div class="flex items-center gap-2">
@@ -146,7 +150,22 @@
                                     <div class="min-w-0">
                                         <h5 class="truncate text-sm font-semibold text-slate-950 dark:text-white">{{ $event['title'] }}</h5>
                                         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $event['time'] }} &middot; {{ $event['calendar'] }}</p>
-                                        @if (! empty($event['attendees']))
+                                        @if (! empty($event['attendee_matches']))
+                                            <div class="mt-2 flex flex-wrap gap-1.5" title="{{ $event['attendees_title'] ?? '' }}">
+                                                @foreach ($event['attendee_matches'] as $attendee)
+                                                    @php
+                                                        $isMatched = (bool) ($attendee['matched'] ?? false);
+                                                        $chipClass = $isMatched
+                                                            ? 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200'
+                                                            : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200';
+                                                        $chipTitle = $isMatched
+                                                            ? 'Found in GHL'.(filled($attendee['business'] ?? null) ? ': '.$attendee['business'] : '')
+                                                            : 'Not found in synced GHL contacts';
+                                                    @endphp
+                                                    <span title="{{ $chipTitle }}" class="max-w-full truncate rounded-md border px-2 py-1 text-[11px] font-medium {{ $chipClass }}">{{ $attendee['label'] }}</span>
+                                                @endforeach
+                                            </div>
+                                        @elseif (! empty($event['attendees']))
                                             <div class="mt-2 flex flex-wrap gap-1.5" title="{{ $event['attendees_title'] ?? '' }}">
                                                 @foreach ($event['attendees'] as $attendee)
                                                     <span class="max-w-full truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300">{{ $attendee }}</span>

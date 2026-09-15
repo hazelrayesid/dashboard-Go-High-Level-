@@ -20,6 +20,7 @@ class GoogleCalendarService
 
     public function __construct(
         private readonly GoogleCalendarEventReader $eventReader,
+        private readonly GoogleCalendarEmailMatcher $emailMatcher,
     ) {}
 
     public function isConfigured(): bool
@@ -134,12 +135,14 @@ class GoogleCalendarService
             return ['events_status' => 'Google Calendar needs to be reconnected before events can be loaded.'];
         }
 
-        return $this->eventReader->upcoming(
+        $state = $this->eventReader->upcoming(
             accessToken: $accessToken,
             month: $request->query('calendar_month'),
             date: $request->query('calendar_date'),
             page: max((int) $request->query('calendar_page', 1), 1),
         );
+
+        return $this->emailMatcher->match($state);
     }
 
     private function validAccessToken(Request $request): ?string
