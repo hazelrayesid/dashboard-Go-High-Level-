@@ -12,6 +12,23 @@
     </div>
 @endif
 
+@if (($syncStatus['cursor'] ?? null) && ($syncStatus['pending'] ?? 0) === 0 && ($syncStatus['failed'] ?? 0) === 0)
+    @php($cursor = $syncStatus['cursor'])
+    <div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100 sm:px-4">
+        <p class="font-medium">HighLevel sync is in progress</p>
+        <p class="mt-1 text-sky-800 dark:text-sky-200">
+            Processing {{ $cursor['tag'] ?? 'campaign tags' }}
+            @if (($cursor['tag_total'] ?? 0) > 0)
+                (tag {{ $cursor['tag_position'] }} of {{ $cursor['tag_total'] }})
+            @endif
+            @if (($cursor['range_total'] ?? 0) > 0)
+                - range {{ $cursor['range_position'] }} of {{ $cursor['range_total'] }}
+            @endif
+            - page {{ $cursor['page'] ?? 1 }}.
+        </p>
+    </div>
+@endif
+
 @if (($syncStatus['failed'] ?? 0) > 0)
     <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100 sm:px-4">
         <p class="font-medium">HighLevel sync job failed</p>

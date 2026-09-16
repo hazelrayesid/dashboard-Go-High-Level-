@@ -166,7 +166,7 @@ class GhlContactSyncService
 
     private function completeChunkedSync(array $cursor): void
     {
-        $this->persister->deleteContactsMissingFromFullSync(
+        $this->persister->pruneContactsMissingFromFullSync(
             $cursor['tags'],
             Carbon::parse($cursor['run_started_at']),
         );

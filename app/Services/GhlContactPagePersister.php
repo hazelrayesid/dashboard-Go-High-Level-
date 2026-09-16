@@ -57,13 +57,13 @@ class GhlContactPagePersister
     /**
      * @param  array<int, string>  $tags
      */
-    public function deleteContactsMissingFromFullSync(array $tags, Carbon $runStartedAt): void
+    public function pruneContactsMissingFromFullSync(array $tags, Carbon $runStartedAt): void
     {
         GhlContact::withTrashed()
             ->where('synced_at', '<', $runStartedAt)
             ->where(fn (Builder $query): Builder => collect($tags)
                 ->reduce(fn (Builder $query, string $tag): Builder => $query->orWhereJsonContains('tags', $tag), $query))
-            ->forceDelete();
+            ->delete();
     }
 
     private function upsertRow(array $contact): array
