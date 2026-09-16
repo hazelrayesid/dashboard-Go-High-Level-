@@ -27,7 +27,7 @@ class GhlDashboardController extends Controller
         return view('dashboards.company-campaign-control', $viewData->make(
             dashboard: $dashboard,
             dateRange: $dateRange,
-            googleCalendar: $googleCalendar->dashboardState($request),
+            googleCalendar: $googleCalendar->dashboardState($request, $dateRange),
             syncStatus: $syncStatus->summary(),
         ));
     }

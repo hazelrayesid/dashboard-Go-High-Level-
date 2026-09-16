@@ -12,6 +12,12 @@
     $eventsLastPage = $googleCalendar['events_last_page'] ?? 1;
     $eventsPerPage = $googleCalendar['events_per_page'] ?? 6;
     $selectedDate = $googleCalendar['calendar_selected_date'] ?? null;
+    $calendarHasDateRange = (bool) ($googleCalendar['calendar_has_date_range'] ?? false);
+    $calendarRangeFrom = $googleCalendar['calendar_range_from'] ?? null;
+    $calendarRangeTo = $googleCalendar['calendar_range_to'] ?? null;
+    $calendarTitleLabel = $selectedDate
+        ? ($googleCalendar['calendar_selected_date_label'] ?? $selectedDate)
+        : (($googleCalendar['calendar_range_label'] ?? null) ?: $calendarMonth->format('F Y'));
     $emailCompare = $googleCalendar['calendar_email_compare'] ?? ['checked' => 0, 'matched' => 0, 'unmatched' => 0, 'available' => true];
 @endphp
 
@@ -76,7 +82,7 @@
 
                             <div class="grid grid-cols-2 gap-2 xl:w-[240px]">
                                 <div class="rounded-md bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-                                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">This month</p>
+                                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ $googleCalendar['calendar_metric_label'] ?? 'This month' }}</p>
                                     <p class="mt-1 text-xl font-semibold text-slate-950 dark:text-white">{{ $monthEventsTotal }}</p>
                                 </div>
                                 <div class="rounded-md bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
@@ -117,7 +123,7 @@
                         <div>
                             <h4 class="text-sm font-semibold text-slate-950 dark:text-white">Upcoming from Google Calendar</h4>
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                {{ $selectedDate ? ($googleCalendar['calendar_selected_date_label'] ?? $selectedDate) : $calendarMonth->format('F Y') }} &middot; {{ $eventsTotal }} unique events
+                                {{ $calendarTitleLabel }} &middot; {{ $eventsTotal }} unique events
                                 @if (($emailCompare['available'] ?? true) && ($emailCompare['checked'] ?? 0) > 0)
                                     &middot; {{ $emailCompare['matched'] }} in GHL &middot; {{ $emailCompare['unmatched'] }} new
                                 @endif
@@ -207,7 +213,7 @@
                         <div class="p-4">
                             <div class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center dark:border-slate-700 dark:bg-slate-950/60">
                                 <h5 class="text-sm font-semibold text-slate-950 dark:text-white">{{ $googleCalendar['connected'] ? 'No upcoming events found' : 'Calendar data will appear after connection' }}</h5>
-                                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $googleCalendar['connected'] ? 'Google Calendar returned no events for this month.' : 'Connect Google Calendar to preview meetings before the company queue.' }}</p>
+                                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $googleCalendar['connected'] ? ($calendarHasDateRange ? 'Google Calendar returned no events for this date range.' : 'Google Calendar returned no events for this month.') : 'Connect Google Calendar to preview meetings before the company queue.' }}</p>
                             </div>
                         </div>
                     @endif
@@ -239,11 +245,16 @@
                         $dateKey = $day->toDateString();
                         $hasEvents = $eventDates->has($dateKey);
                         $isSelectedDate = $selectedDate === $dateKey;
+                        $isInDateRange = $calendarHasDateRange
+                            && (! $calendarRangeFrom || $dateKey >= $calendarRangeFrom)
+                            && (! $calendarRangeTo || $dateKey <= $calendarRangeTo);
                         $dayClass = $isSelectedDate
                             ? 'border-teal-600 bg-teal-600 text-white shadow-sm dark:border-teal-400 dark:bg-teal-500 dark:text-slate-950'
-                            : ($day->isSameMonth($calendarMonth)
-                                ? 'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'
-                                : 'border-transparent text-slate-300 dark:text-slate-700');
+                            : ($isInDateRange
+                                ? 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-100'
+                                : ($day->isSameMonth($calendarMonth)
+                                    ? 'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'
+                                    : 'border-transparent text-slate-300 dark:text-slate-700'));
                         $todayClass = ! $isSelectedDate && $day->isToday()
                             ? 'ring-2 ring-slate-950 ring-offset-1 ring-offset-slate-50 dark:ring-white dark:ring-offset-slate-950'
                             : '';

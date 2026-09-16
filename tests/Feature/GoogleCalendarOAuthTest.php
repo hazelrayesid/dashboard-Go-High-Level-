@@ -150,4 +150,40 @@ class GoogleCalendarOAuthTest extends TestCase
         $this->assertSame('funeral.directors1@outlook.com', $state['events'][0]['attendees_title']);
         $this->assertSame('Calendar', $state['events'][0]['calendar']);
     }
+
+    public function test_google_calendar_uses_dashboard_date_range_for_event_window(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://www.googleapis.com/calendar/v3/users/me/calendarList*' => Http::response([
+                'items' => [
+                    ['id' => 'primary', 'summary' => 'Campaign calendar', 'primary' => true],
+                ],
+            ]),
+            'https://www.googleapis.com/calendar/v3/calendars/*/events*' => Http::response([
+                'items' => [
+                    [
+                        'id' => 'event_456',
+                        'summary' => 'Range meeting',
+                        'start' => ['dateTime' => '2026-09-11T10:00:00+07:00'],
+                        'end' => ['dateTime' => '2026-09-11T10:30:00+07:00'],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $state = app(GoogleCalendarEventReader::class)->upcoming(
+            accessToken: 'access-token',
+            month: '2026-09',
+            dateRange: ['from' => '2026-09-10', 'to' => '2026-09-12'],
+        );
+
+        $this->assertSame('This range', $state['calendar_metric_label']);
+        $this->assertSame('Sep 10, 2026 - Sep 12, 2026', $state['calendar_range_label']);
+        $this->assertSame(['2026-09-11'], $state['event_dates']);
+
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), '/events')
+            && str_starts_with($request->data()['timeMin'] ?? '', '2026-09-10T00:00:00')
+            && str_starts_with($request->data()['timeMax'] ?? '', '2026-09-12T23:59:59'));
+    }
 }

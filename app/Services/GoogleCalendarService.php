@@ -106,7 +106,7 @@ class GoogleCalendarService
     /**
      * @return array<string, mixed>
      */
-    public function dashboardState(Request $request): array
+    public function dashboardState(Request $request, array $dateRange = []): array
     {
         $state = [
             'configured' => $this->isConfigured(),
@@ -121,13 +121,13 @@ class GoogleCalendarService
             return $state;
         }
 
-        return array_merge($state, $this->upcomingEventsState($request));
+        return array_merge($state, $this->upcomingEventsState($request, $dateRange));
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function upcomingEventsState(Request $request): array
+    private function upcomingEventsState(Request $request, array $dateRange): array
     {
         $accessToken = $this->validAccessToken($request);
 
@@ -140,6 +140,7 @@ class GoogleCalendarService
             month: $request->query('calendar_month'),
             date: $request->query('calendar_date'),
             page: max((int) $request->query('calendar_page', 1), 1),
+            dateRange: $dateRange,
         );
 
         return $this->emailMatcher->match($state);

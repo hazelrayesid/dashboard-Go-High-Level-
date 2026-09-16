@@ -25,14 +25,23 @@ class GoogleCalendarEventReader
     /**
      * @return array<string, mixed>
      */
-    public function upcoming(string $accessToken, mixed $month = null, mixed $date = null, int $page = 1): array
+    public function upcoming(string $accessToken, mixed $month = null, mixed $date = null, int $page = 1, array $dateRange = []): array
     {
         $selectedDate = $this->selectedDate($date);
-        $monthStart = $selectedDate?->copy()->startOfMonth() ?? $this->monthStart($month);
+        $rangeStart = $this->rangeDate($dateRange['from'] ?? null)?->startOfDay();
+        $rangeEnd = $this->rangeDate($dateRange['to'] ?? null)?->endOfDay();
+        $hasDateRange = $rangeStart !== null || $rangeEnd !== null;
+        $monthStart = $selectedDate?->copy()->startOfMonth() ?? $this->monthStart($month, $rangeStart);
         $monthEnd = $monthStart->copy()->endOfMonth();
+        $eventsStart = $rangeStart ?? $monthStart->copy()->startOfDay();
+        $eventsEnd = $rangeEnd ?? $monthEnd->copy()->endOfDay();
+        if ($eventsStart->greaterThan($eventsEnd)) {
+            [$eventsStart, $eventsEnd] = [$eventsEnd->copy()->startOfDay(), $eventsStart->copy()->endOfDay()];
+        }
+
         $calendars = $this->visibleCalendars($accessToken);
         $events = collect($calendars)
-            ->flatMap(fn (array $calendar): array => $this->calendarEvents($accessToken, $calendar, $monthStart, $monthEnd))
+            ->flatMap(fn (array $calendar): array => $this->calendarEvents($accessToken, $calendar, $eventsStart, $eventsEnd))
             ->unique('dedupe_key')
             ->sortBy('starts_at')
             ->values();
@@ -56,6 +65,7 @@ class GoogleCalendarEventReader
             'event_dates' => $events->pluck('date_key')->unique()->values()->all(),
             'events_total' => $displayEvents->count(),
             'calendar_month_events_total' => $events->count(),
+            'calendar_metric_label' => $hasDateRange ? 'This range' : 'This month',
             'events_page' => $page,
             'events_last_page' => $lastPage,
             'events_per_page' => self::EventsPerPage,
@@ -63,6 +73,10 @@ class GoogleCalendarEventReader
             'calendar_month_label' => $monthStart->format('F Y'),
             'calendar_selected_date' => $selectedDate?->toDateString(),
             'calendar_selected_date_label' => $selectedDate?->format('M j, Y'),
+            'calendar_has_date_range' => $hasDateRange,
+            'calendar_range_from' => $rangeStart?->toDateString(),
+            'calendar_range_to' => $rangeEnd?->toDateString(),
+            'calendar_range_label' => $hasDateRange ? $this->rangeLabel($rangeStart, $rangeEnd) : null,
             'calendar_previous_month' => $monthStart->copy()->subMonthNoOverflow()->format('Y-m'),
             'calendar_next_month' => $monthStart->copy()->addMonthNoOverflow()->format('Y-m'),
         ];
@@ -170,13 +184,13 @@ class GoogleCalendarEventReader
         ];
     }
 
-    private function monthStart(mixed $month): Carbon
+    private function monthStart(mixed $month, ?Carbon $fallback = null): Carbon
     {
         if (is_string($month) && preg_match('/^\d{4}-\d{2}$/', $month) === 1) {
             return Carbon::createFromFormat('Y-m', $month, $this->displayTimezone())->startOfMonth();
         }
 
-        return now($this->displayTimezone())->startOfMonth();
+        return ($fallback ?? now($this->displayTimezone()))->copy()->startOfMonth();
     }
 
     private function selectedDate(mixed $date): ?Carbon
@@ -186,6 +200,25 @@ class GoogleCalendarEventReader
         }
 
         return null;
+    }
+
+    private function rangeDate(mixed $date): ?Carbon
+    {
+        if (is_string($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+            return Carbon::parse($date, $this->displayTimezone());
+        }
+
+        return null;
+    }
+
+    private function rangeLabel(?Carbon $from, ?Carbon $to): string
+    {
+        return match (true) {
+            $from !== null && $to !== null => $from->format('M j, Y').' - '.$to->format('M j, Y'),
+            $from !== null => 'From '.$from->format('M j, Y'),
+            $to !== null => 'Until '.$to->format('M j, Y'),
+            default => '',
+        };
     }
 
     private function displayTime(Carbon $time): Carbon
