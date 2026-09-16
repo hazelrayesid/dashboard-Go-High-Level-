@@ -4,11 +4,19 @@ namespace Tests\Feature;
 
 use App\Services\GoogleCalendarEventReader;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class GoogleCalendarOAuthTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::flush();
+    }
+
     public function test_google_calendar_connect_redirects_to_google_oauth(): void
     {
         config([
@@ -185,5 +193,57 @@ class GoogleCalendarOAuthTest extends TestCase
         Http::assertSent(fn ($request): bool => str_contains($request->url(), '/events')
             && str_starts_with($request->data()['timeMin'] ?? '', '2026-09-10T00:00:00')
             && str_starts_with($request->data()['timeMax'] ?? '', '2026-09-12T23:59:59'));
+    }
+
+    public function test_google_calendar_reuses_cached_month_events_when_switching_dates(): void
+    {
+        $eventRequests = 0;
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://www.googleapis.com/calendar/v3/users/me/calendarList*' => Http::response([
+                'items' => [
+                    ['id' => 'primary', 'summary' => 'Campaign calendar', 'primary' => true],
+                ],
+            ]),
+            'https://www.googleapis.com/calendar/v3/calendars/*/events*' => function () use (&$eventRequests) {
+                $eventRequests++;
+
+                return Http::response([
+                    'items' => [
+                        [
+                            'id' => 'event_15',
+                            'summary' => 'Cached date 15',
+                            'start' => ['dateTime' => '2026-09-15T09:00:00+07:00'],
+                            'end' => ['dateTime' => '2026-09-15T09:30:00+07:00'],
+                        ],
+                        [
+                            'id' => 'event_16',
+                            'summary' => 'Cached date 16',
+                            'start' => ['dateTime' => '2026-09-16T10:00:00+07:00'],
+                            'end' => ['dateTime' => '2026-09-16T10:30:00+07:00'],
+                        ],
+                    ],
+                ]);
+            },
+        ]);
+
+        $reader = app(GoogleCalendarEventReader::class);
+        $firstState = $reader->upcoming(
+            accessToken: 'access-token',
+            month: '2026-09',
+            date: '2026-09-16',
+            cacheScope: 'account-a',
+        );
+        $secondState = $reader->upcoming(
+            accessToken: 'access-token',
+            month: '2026-09',
+            date: '2026-09-15',
+            cacheScope: 'account-a',
+        );
+
+        $this->assertSame('Cached date 16', $firstState['events'][0]['title']);
+        $this->assertSame('Cached date 15', $secondState['events'][0]['title']);
+        $this->assertSame(1, $eventRequests);
     }
 }

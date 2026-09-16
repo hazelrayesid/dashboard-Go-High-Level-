@@ -2,9 +2,7 @@
 
 namespace App\Services;
 
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
 
 class GoogleCalendarEventReader
 {
@@ -12,21 +10,23 @@ class GoogleCalendarEventReader
 
     private const InternalAttendeeNames = ['michael doyle'];
 
-    private const CALENDAR_LIST_URL = 'https://www.googleapis.com/calendar/v3/users/me/calendarList';
-
-    private const EVENTS_BASE_URL = 'https://www.googleapis.com/calendar/v3/calendars';
-
     private const EventsPerPage = 6;
 
-    private const MaxCalendars = 12;
-
-    private const MaxEventsPerCalendar = 100;
+    public function __construct(private readonly GoogleCalendarApiClient $calendarApi) {}
 
     /**
      * @return array<string, mixed>
      */
-    public function upcoming(string $accessToken, mixed $month = null, mixed $date = null, int $page = 1, array $dateRange = []): array
+    public function upcoming(
+        string $accessToken,
+        mixed $month = null,
+        mixed $date = null,
+        int $page = 1,
+        array $dateRange = [],
+        ?string $cacheScope = null,
+    ): array
     {
+        $cacheScope ??= 'default';
         $selectedDate = $this->selectedDate($date);
         $rangeStart = $this->rangeDate($dateRange['from'] ?? null)?->startOfDay();
         $rangeEnd = $this->rangeDate($dateRange['to'] ?? null)?->endOfDay();
@@ -39,12 +39,17 @@ class GoogleCalendarEventReader
             [$eventsStart, $eventsEnd] = [$eventsEnd->copy()->startOfDay(), $eventsStart->copy()->endOfDay()];
         }
 
-        $calendars = $this->visibleCalendars($accessToken);
-        $events = collect($calendars)
-            ->flatMap(fn (array $calendar): array => $this->calendarEvents($accessToken, $calendar, $eventsStart, $eventsEnd))
+        $calendars = $this->calendarApi->visibleCalendars($accessToken, $cacheScope);
+        $events = collect($this->calendarApi->eventsForWindow($accessToken, $calendars, $eventsStart, $eventsEnd, $cacheScope))
+            ->map(fn (array $item): ?array => $this->formatEvent($item['event'], $item['calendar_title']))
+            ->filter()
             ->unique('dedupe_key')
             ->sortBy('starts_at')
             ->values();
+        $windowEvents = $events
+            ->map(fn (array $event): array => collect($event)->except(['starts_at', 'dedupe_key'])->all())
+            ->values()
+            ->all();
         $displayEvents = $selectedDate
             ? $events->where('date_key', $selectedDate->toDateString())->values()
             : $events;
@@ -62,6 +67,7 @@ class GoogleCalendarEventReader
 
         $state = [
             'events' => $visibleEvents,
+            'calendar_events_window' => $windowEvents,
             'event_dates' => $events->pluck('date_key')->unique()->values()->all(),
             'events_total' => $displayEvents->count(),
             'calendar_month_events_total' => $events->count(),
@@ -86,67 +92,6 @@ class GoogleCalendarEventReader
         }
 
         return $state;
-    }
-
-    /**
-     * @return array<int, array{id: string, title: string, fallback?: bool}>
-     */
-    private function visibleCalendars(string $accessToken): array
-    {
-        try {
-            $response = Http::withToken($accessToken)->timeout(10)->get(self::CALENDAR_LIST_URL, [
-                'maxResults' => 50,
-                'showHidden' => 'false',
-            ]);
-        } catch (ConnectionException) {
-            return [];
-        }
-
-        if ($response->failed()) {
-            return [['id' => 'primary', 'title' => 'Primary calendar', 'fallback' => true]];
-        }
-
-        $calendars = collect($response->json('items', []))
-            ->filter(fn (mixed $calendar): bool => is_array($calendar) && ! $this->isNoiseCalendar($calendar))
-            ->sortByDesc(fn (array $calendar): int => ($calendar['primary'] ?? false) ? 2 : (($calendar['selected'] ?? false) ? 1 : 0))
-            ->map(fn (array $calendar): array => [
-                'id' => (string) $calendar['id'],
-                'title' => (string) ($calendar['summaryOverride'] ?? $calendar['summary'] ?? 'Calendar'),
-            ])
-            ->take(self::MaxCalendars)
-            ->values()
-            ->all();
-
-        return $calendars ?: [['id' => 'primary', 'title' => 'Primary calendar']];
-    }
-
-    /**
-     * @param  array{id: string, title: string}  $calendar
-     * @return array<int, array<string, mixed>>
-     */
-    private function calendarEvents(string $accessToken, array $calendar, Carbon $monthStart, Carbon $monthEnd): array
-    {
-        try {
-            $response = Http::withToken($accessToken)
-                ->timeout(10)
-                ->get(self::EVENTS_BASE_URL.'/'.rawurlencode($calendar['id']).'/events', [
-                    'singleEvents' => 'true',
-                    'orderBy' => 'startTime',
-                    'maxResults' => self::MaxEventsPerCalendar,
-                    'timeMin' => $monthStart->copy()->startOfDay()->toRfc3339String(),
-                    'timeMax' => $monthEnd->copy()->endOfDay()->toRfc3339String(),
-                ]);
-        } catch (ConnectionException) {
-            return [];
-        }
-
-        return $response->failed()
-            ? []
-            : collect($response->json('items', []))
-                ->map(fn (array $event): ?array => $this->formatEvent($event, $calendar['title']))
-                ->filter()
-                ->values()
-                ->all();
     }
 
     private function formatEvent(array $event, string $calendarTitle): ?array
@@ -275,18 +220,6 @@ class GoogleCalendarEventReader
     private function displayCalendarTitle(string $calendarTitle): string
     {
         return str_contains(strtolower($calendarTitle), 'top4') ? 'Calendar' : $calendarTitle;
-    }
-
-    private function isNoiseCalendar(array $calendar): bool
-    {
-        $id = (string) ($calendar['id'] ?? '');
-        $title = str((string) ($calendar['summary'] ?? ''))->lower()->toString();
-
-        return (bool) ($calendar['deleted'] ?? false)
-            || (bool) ($calendar['hidden'] ?? false)
-            || str_contains($id, '#holiday')
-            || str_contains($id, '#contacts')
-            || in_array($title, ['birthdays', 'tasks'], true);
     }
 
     private function dedupeKey(array $event, Carbon $startsAt, ?Carbon $endsAt): string

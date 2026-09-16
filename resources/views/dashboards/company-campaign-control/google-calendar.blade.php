@@ -12,6 +12,7 @@
     $eventsLastPage = $googleCalendar['events_last_page'] ?? 1;
     $eventsPerPage = $googleCalendar['events_per_page'] ?? 6;
     $selectedDate = $googleCalendar['calendar_selected_date'] ?? null;
+    $calendarWindowEvents = collect($googleCalendar['calendar_events_window'] ?? $calendarEvents->all());
     $calendarHasDateRange = (bool) ($googleCalendar['calendar_has_date_range'] ?? false);
     $calendarRangeFrom = $googleCalendar['calendar_range_from'] ?? null;
     $calendarRangeTo = $googleCalendar['calendar_range_to'] ?? null;
@@ -21,7 +22,17 @@
     $emailCompare = $googleCalendar['calendar_email_compare'] ?? ['checked' => 0, 'matched' => 0, 'unmatched' => 0, 'available' => true];
 @endphp
 
-<section class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+<section
+    data-calendar-root
+    data-calendar-selected-date="{{ $selectedDate }}"
+    data-calendar-month-label="{{ $calendarMonth->format('F Y') }}"
+    data-calendar-range-label="{{ $googleCalendar['calendar_range_label'] ?? '' }}"
+    data-calendar-range-from="{{ $calendarRangeFrom }}"
+    data-calendar-range-to="{{ $calendarRangeTo }}"
+    data-calendar-events-per-page="{{ $eventsPerPage }}"
+    class="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+>
+    <script type="application/json" data-calendar-events-json>{!! json_encode($calendarWindowEvents->values()->all(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
     <div class="grid lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
         <div class="border-b border-slate-200 p-4 dark:border-slate-800 lg:border-b-0 lg:border-r">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -87,7 +98,7 @@
                                 </div>
                                 <div class="rounded-md bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
                                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Selected</p>
-                                    <p class="mt-1 text-xl font-semibold text-slate-950 dark:text-white">{{ $eventsTotal }}</p>
+                                    <p data-calendar-selected-total class="mt-1 text-xl font-semibold text-slate-950 dark:text-white">{{ $eventsTotal }}</p>
                                 </div>
                             </div>
 
@@ -122,7 +133,7 @@
                     <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h4 class="text-sm font-semibold text-slate-950 dark:text-white">Upcoming from Google Calendar</h4>
-                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            <p data-calendar-summary class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                 {{ $calendarTitleLabel }} &middot; {{ $eventsTotal }} unique events
                                 @if (($emailCompare['available'] ?? true) && ($emailCompare['checked'] ?? 0) > 0)
                                     &middot; {{ $emailCompare['matched'] }} in GHL &middot; {{ $emailCompare['unmatched'] }} new
@@ -133,9 +144,7 @@
                             <a href="{{ request()->fullUrlWithQuery(['calendar_month' => $googleCalendar['calendar_previous_month'] ?? $calendarMonth->copy()->subMonthNoOverflow()->format('Y-m'), 'calendar_date' => null, 'calendar_page' => 1]) }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-sky-300 hover:text-sky-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300">Prev</a>
                             <span class="rounded-md bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">Live</span>
                             <a href="{{ request()->fullUrlWithQuery(['calendar_month' => $googleCalendar['calendar_next_month'] ?? $calendarMonth->copy()->addMonthNoOverflow()->format('Y-m'), 'calendar_date' => null, 'calendar_page' => 1]) }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-sky-300 hover:text-sky-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300">Next</a>
-                            @if ($selectedDate)
-                                <a href="{{ request()->fullUrlWithQuery(['calendar_date' => null, 'calendar_page' => 1]) }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">Month</a>
-                            @endif
+                            <a data-calendar-clear href="{{ request()->fullUrlWithQuery(['calendar_date' => null, 'calendar_page' => 1]) }}" class="{{ $selectedDate ? '' : 'hidden' }} rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">Month</a>
                         </div>
                     </div>
 
@@ -145,8 +154,8 @@
                         </div>
                     @endif
 
-                    @if ($calendarEvents->isNotEmpty())
-                        <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                    <div data-calendar-list class="{{ $calendarEvents->isNotEmpty() ? '' : 'hidden' }} divide-y divide-slate-100 dark:divide-slate-800">
+                        @if ($calendarEvents->isNotEmpty())
                             @foreach ($calendarEvents as $event)
                                 <article class="grid gap-3 px-4 py-3 sm:grid-cols-[64px_minmax(0,1fr)_auto] sm:items-center">
                                     <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-center dark:border-slate-800 dark:bg-slate-950/70">
@@ -189,34 +198,32 @@
                                     </div>
                                 </article>
                             @endforeach
-                        </div>
+                        @endif
+                    </div>
 
-                        @if ($eventsLastPage > 1)
-                            <div class="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-                                <p class="text-xs text-slate-500 dark:text-slate-400">Page {{ $eventsPage }} of {{ $eventsLastPage }} &middot; {{ $eventsPerPage }} per page</p>
+                    <div data-calendar-pagination class="{{ $eventsLastPage > 1 ? '' : 'hidden' }} flex flex-col gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                                <p data-calendar-pagination-label class="text-xs text-slate-500 dark:text-slate-400">Page {{ $eventsPage }} of {{ $eventsLastPage }} &middot; {{ $eventsPerPage }} per page</p>
                                 <div class="flex items-center gap-2">
                                     @if ($eventsPage > 1)
-                                        <a href="{{ request()->fullUrlWithQuery(['calendar_page' => $eventsPage - 1]) }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-sky-300 hover:text-sky-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300">Previous</a>
+                                        <a data-calendar-page="{{ $eventsPage - 1 }}" href="{{ request()->fullUrlWithQuery(['calendar_page' => $eventsPage - 1]) }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-sky-300 hover:text-sky-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300">Previous</a>
                                     @else
-                                        <span class="rounded-md border border-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-300 dark:border-slate-800 dark:text-slate-600">Previous</span>
+                                        <span data-calendar-page-prev class="rounded-md border border-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-300 dark:border-slate-800 dark:text-slate-600">Previous</span>
                                     @endif
 
                                     @if ($eventsPage < $eventsLastPage)
-                                        <a href="{{ request()->fullUrlWithQuery(['calendar_page' => $eventsPage + 1]) }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-sky-300 hover:text-sky-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300">Next page</a>
+                                        <a data-calendar-page="{{ $eventsPage + 1 }}" href="{{ request()->fullUrlWithQuery(['calendar_page' => $eventsPage + 1]) }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-sky-300 hover:text-sky-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-sky-500 dark:hover:text-sky-300">Next page</a>
                                     @else
-                                        <span class="rounded-md border border-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-300 dark:border-slate-800 dark:text-slate-600">Next page</span>
+                                        <span data-calendar-page-next class="rounded-md border border-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-300 dark:border-slate-800 dark:text-slate-600">Next page</span>
                                     @endif
                                 </div>
-                            </div>
-                        @endif
-                    @else
-                        <div class="p-4">
+                    </div>
+
+                    <div data-calendar-empty class="{{ $calendarEvents->isNotEmpty() ? 'hidden' : '' }} p-4">
                             <div class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center dark:border-slate-700 dark:bg-slate-950/60">
                                 <h5 class="text-sm font-semibold text-slate-950 dark:text-white">{{ $googleCalendar['connected'] ? 'No upcoming events found' : 'Calendar data will appear after connection' }}</h5>
                                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $googleCalendar['connected'] ? ($calendarHasDateRange ? 'Google Calendar returned no events for this date range.' : 'Google Calendar returned no events for this month.') : 'Connect Google Calendar to preview meetings before the company queue.' }}</p>
                             </div>
-                        </div>
-                    @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -259,7 +266,13 @@
                             ? 'ring-2 ring-slate-950 ring-offset-1 ring-offset-slate-50 dark:ring-white dark:ring-offset-slate-950'
                             : '';
                     @endphp
-                    <a href="{{ request()->fullUrlWithQuery(['calendar_month' => $day->format('Y-m'), 'calendar_date' => $dateKey, 'calendar_page' => 1]) }}" class="relative flex aspect-square min-h-10 items-center justify-center rounded-md border text-sm font-semibold transition hover:border-teal-300 hover:text-teal-800 dark:hover:border-teal-500 dark:hover:text-teal-300 {{ $dayClass }} {{ $todayClass }}">
+                    <a
+                        data-calendar-day="{{ $dateKey }}"
+                        data-calendar-current-month="{{ $day->isSameMonth($calendarMonth) ? '1' : '0' }}"
+                        data-calendar-in-range="{{ $isInDateRange ? '1' : '0' }}"
+                        href="{{ request()->fullUrlWithQuery(['calendar_month' => $day->format('Y-m'), 'calendar_date' => $dateKey, 'calendar_page' => 1]) }}"
+                        class="relative flex aspect-square min-h-10 items-center justify-center rounded-md border text-sm font-semibold transition hover:border-teal-300 hover:text-teal-800 dark:hover:border-teal-500 dark:hover:text-teal-300 {{ $dayClass }} {{ $todayClass }}"
+                    >
                         {{ $day->day }}
                         @if ($hasEvents)
                             <span class="absolute bottom-1.5 h-1.5 w-1.5 rounded-full {{ $isSelectedDate ? 'bg-white dark:bg-slate-950' : 'bg-teal-500' }}"></span>
@@ -268,7 +281,7 @@
                 @endforeach
             </div>
 
-            <div class="mt-4 grid gap-2">
+            <div data-calendar-aside-list class="mt-4 grid gap-2">
                 @forelse ($calendarEvents->take(3) as $event)
                     <div class="rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
                         <div class="flex items-center justify-between gap-3">

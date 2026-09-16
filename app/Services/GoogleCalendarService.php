@@ -141,9 +141,18 @@ class GoogleCalendarService
             date: $request->query('calendar_date'),
             page: max((int) $request->query('calendar_page', 1), 1),
             dateRange: $dateRange,
+            cacheScope: $this->calendarCacheScope($request),
         );
 
         return $this->emailMatcher->match($state);
+    }
+
+    private function calendarCacheScope(Request $request): string
+    {
+        $accountEmail = $request->session()->get('google_calendar.account.email');
+        $scope = filled($accountEmail) ? strtolower((string) $accountEmail) : $request->session()->getId();
+
+        return hash('sha256', $scope);
     }
 
     private function validAccessToken(Request $request): ?string
