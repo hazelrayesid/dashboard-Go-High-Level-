@@ -1,14 +1,14 @@
-<header class="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-6 lg:px-8">
-    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+<header class="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-6 sm:py-4 lg:px-8">
+    <div class="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div>
-            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Live production data from HighLevel</p>
-            <h2 class="mt-1 text-2xl font-semibold tracking-normal text-slate-950 dark:text-white">Campaign workspace</h2>
+            <p class="text-xs font-medium text-slate-500 dark:text-slate-400 sm:text-sm">Live production data from HighLevel</p>
+            <h2 class="mt-1 text-xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-2xl">Campaign workspace</h2>
         </div>
 
-        <div class="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
+        <div class="flex items-center gap-2 pb-1">
             <div class="flex rounded-md border border-slate-200 bg-slate-100 p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-label="Quick filters">
                 @foreach ($filterOptions as $option)
-                    <button type="button" data-filter-button="{{ $option['filter'] }}" class="shrink-0 rounded-[5px] px-3.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-950 data-[active=true]:bg-slate-950 data-[active=true]:text-white data-[active=true]:shadow-sm dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:data-[active=true]:bg-white dark:data-[active=true]:text-slate-950" @if ($option['filter'] === 'all') data-active="true" @endif>
+                    <button type="button" data-filter-button="{{ $option['filter'] }}" class="shrink-0 rounded-[5px] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-950 data-[active=true]:bg-slate-950 data-[active=true]:text-white data-[active=true]:shadow-sm dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:data-[active=true]:bg-white dark:data-[active=true]:text-slate-950 sm:px-3.5 sm:py-2 sm:text-sm" @if ($option['filter'] === 'all') data-active="true" @endif>
                         {{ $option['label'] }}
                     </button>
                 @endforeach

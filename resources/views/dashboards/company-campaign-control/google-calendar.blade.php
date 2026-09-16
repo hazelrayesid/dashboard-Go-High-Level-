@@ -34,7 +34,7 @@
 >
     <script type="application/json" data-calendar-events-json>{!! json_encode($calendarWindowEvents->values()->all(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
     <div class="grid lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-        <div class="border-b border-slate-200 p-4 dark:border-slate-800 lg:border-b-0 lg:border-r">
+        <div class="border-b border-slate-200 p-3 dark:border-slate-800 sm:p-4 lg:border-b-0 lg:border-r">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
@@ -58,8 +58,8 @@
                 <p class="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">{{ session('google_calendar_error') }}</p>
             @endif
 
-            <div class="mt-5 grid gap-4">
-                <div class="rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+            <div class="mt-4 grid gap-3 sm:mt-5 sm:gap-4">
+                <div class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-4">
                     @if ($googleCalendar['connected'])
                         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                             <div class="flex min-w-0 items-center gap-3">
@@ -130,7 +130,7 @@
                 </div>
 
                 <div class="rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                    <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                         <div>
                             <h4 class="text-sm font-semibold text-slate-950 dark:text-white">Upcoming from Google Calendar</h4>
                             <p data-calendar-summary class="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -157,7 +157,7 @@
                     <div data-calendar-list class="{{ $calendarEvents->isNotEmpty() ? '' : 'hidden' }} divide-y divide-slate-100 dark:divide-slate-800">
                         @if ($calendarEvents->isNotEmpty())
                             @foreach ($calendarEvents as $event)
-                                <article class="grid gap-3 px-4 py-3 sm:grid-cols-[64px_minmax(0,1fr)_auto] sm:items-center">
+                                <article class="grid gap-3 px-3 py-3 sm:grid-cols-[64px_minmax(0,1fr)_auto] sm:items-center sm:px-4">
                                     <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-center dark:border-slate-800 dark:bg-slate-950/70">
                                         <p class="text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400">{{ $event['day'] }}</p>
                                         <p class="mt-1 text-sm font-semibold text-slate-950 dark:text-white">{{ $event['date'] }}</p>
@@ -201,7 +201,7 @@
                         @endif
                     </div>
 
-                    <div data-calendar-pagination class="{{ $eventsLastPage > 1 ? '' : 'hidden' }} flex flex-col gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                    <div data-calendar-pagination class="{{ $eventsLastPage > 1 ? '' : 'hidden' }} flex flex-col gap-3 border-t border-slate-100 px-3 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-4">
                                 <p data-calendar-pagination-label class="text-xs text-slate-500 dark:text-slate-400">Page {{ $eventsPage }} of {{ $eventsLastPage }} &middot; {{ $eventsPerPage }} per page</p>
                                 <div class="flex items-center gap-2">
                                     @if ($eventsPage > 1)
@@ -218,7 +218,7 @@
                                 </div>
                     </div>
 
-                    <div data-calendar-empty class="{{ $calendarEvents->isNotEmpty() ? 'hidden' : '' }} p-4">
+                    <div data-calendar-empty class="{{ $calendarEvents->isNotEmpty() ? 'hidden' : '' }} p-3 sm:p-4">
                             <div class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center dark:border-slate-700 dark:bg-slate-950/60">
                                 <h5 class="text-sm font-semibold text-slate-950 dark:text-white">{{ $googleCalendar['connected'] ? 'No upcoming events found' : 'Calendar data will appear after connection' }}</h5>
                                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ $googleCalendar['connected'] ? ($calendarHasDateRange ? 'Google Calendar returned no events for this date range.' : 'Google Calendar returned no events for this month.') : 'Connect Google Calendar to preview meetings before the company queue.' }}</p>
@@ -228,7 +228,7 @@
             </div>
         </div>
 
-        <aside class="bg-slate-50 p-4 dark:bg-slate-950/50">
+        <aside class="bg-slate-50 p-3 dark:bg-slate-950/50 sm:p-4">
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <h4 class="text-sm font-semibold text-slate-950 dark:text-white">{{ $calendarMonth->format('F Y') }}</h4>
@@ -271,7 +271,7 @@
                         data-calendar-current-month="{{ $day->isSameMonth($calendarMonth) ? '1' : '0' }}"
                         data-calendar-in-range="{{ $isInDateRange ? '1' : '0' }}"
                         href="{{ request()->fullUrlWithQuery(['calendar_month' => $day->format('Y-m'), 'calendar_date' => $dateKey, 'calendar_page' => 1]) }}"
-                        class="relative flex aspect-square min-h-10 items-center justify-center rounded-md border text-sm font-semibold transition hover:border-teal-300 hover:text-teal-800 dark:hover:border-teal-500 dark:hover:text-teal-300 {{ $dayClass }} {{ $todayClass }}"
+                        class="relative flex aspect-square min-h-9 items-center justify-center rounded-md border text-sm font-semibold transition hover:border-teal-300 hover:text-teal-800 dark:hover:border-teal-500 dark:hover:text-teal-300 sm:min-h-10 {{ $dayClass }} {{ $todayClass }}"
                     >
                         {{ $day->day }}
                         @if ($hasEvents)
