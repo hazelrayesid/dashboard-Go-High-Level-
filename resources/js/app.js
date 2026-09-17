@@ -180,11 +180,14 @@ const calendarEventCard = (event) => {
                 const chipClass = matched
                     ? 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200'
                     : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200';
+                const matchCount = Number(attendee.match_count || (matched ? 1 : 0));
+                const businesses = (attendee.businesses ?? []).filter(Boolean).slice(0, 3).join(', ');
                 const title = matched
-                    ? `Found in GHL${attendee.business ? `: ${attendee.business}` : ''}`
+                    ? `Found in GHL (${matchCount})${businesses ? `: ${businesses}` : (attendee.business ? `: ${attendee.business}` : '')}`
                     : 'Not found in synced GHL contacts';
+                const label = `${attendee.label}${matched ? ` (${matchCount})` : ''}`;
 
-                return `<span title="${escapeHtml(title)}" class="max-w-full truncate rounded-md border px-2 py-1 text-[11px] font-medium ${chipClass}">${escapeHtml(attendee.label)}</span>`;
+                return `<span title="${escapeHtml(title)}" class="max-w-full truncate rounded-md border px-2 py-1 text-[11px] font-medium ${chipClass}">${escapeHtml(label)}</span>`;
             }).join('')}
         </div>`
         : ((event.attendees ?? []).length

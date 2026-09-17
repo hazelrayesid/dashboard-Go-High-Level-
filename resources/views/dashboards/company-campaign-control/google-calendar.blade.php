@@ -173,11 +173,17 @@
                                                         $chipClass = $isMatched
                                                             ? 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200'
                                                             : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200';
+                                                        $matchCount = (int) ($attendee['match_count'] ?? ($isMatched ? 1 : 0));
+                                                        $matchedBusinesses = collect($attendee['businesses'] ?? [])
+                                                            ->filter()
+                                                            ->take(3)
+                                                            ->implode(', ');
                                                         $chipTitle = $isMatched
-                                                            ? 'Found in GHL'.(filled($attendee['business'] ?? null) ? ': '.$attendee['business'] : '')
+                                                            ? 'Found in GHL ('.$matchCount.')'.($matchedBusinesses !== '' ? ': '.$matchedBusinesses : (filled($attendee['business'] ?? null) ? ': '.$attendee['business'] : ''))
                                                             : 'Not found in synced GHL contacts';
+                                                        $chipLabel = $attendee['label'].($isMatched ? ' ('.$matchCount.')' : '');
                                                     @endphp
-                                                    <span title="{{ $chipTitle }}" class="max-w-full truncate rounded-md border px-2 py-1 text-[11px] font-medium {{ $chipClass }}">{{ $attendee['label'] }}</span>
+                                                    <span title="{{ $chipTitle }}" class="max-w-full truncate rounded-md border px-2 py-1 text-[11px] font-medium {{ $chipClass }}">{{ $chipLabel }}</span>
                                                 @endforeach
                                             </div>
                                         @elseif (! empty($event['attendees']))

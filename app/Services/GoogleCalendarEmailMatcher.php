@@ -79,13 +79,21 @@ class GoogleCalendarEmailMatcher
                         $email = $this->normalizeEmail((string) ($attendee['email'] ?? ''));
                         $contacts = $email !== '' ? $contactsByEmail->get($email, collect()) : collect();
                         $contact = $contacts->first();
+                        $matchCount = $contacts->count();
 
                         return [
                             'label' => $attendee['label'] ?? $email,
                             'email' => $email,
                             'matched' => $contact !== null,
+                            'match_count' => $matchCount,
                             'contact_name' => $contact?->name,
                             'business' => $contact?->business,
+                            'businesses' => $contacts
+                                ->pluck('business')
+                                ->filter()
+                                ->unique()
+                                ->values()
+                                ->all(),
                         ];
                     })
                     ->values()
