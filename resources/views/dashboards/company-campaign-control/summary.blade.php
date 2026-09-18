@@ -38,20 +38,47 @@
                     <p class="text-xs font-medium uppercase tracking-normal text-slate-500 dark:text-slate-400">Companies loaded</p>
                     <p class="mt-1 text-lg font-semibold text-slate-950 dark:text-white sm:text-2xl">{{ number_format($totals['companies_loaded']) }}</p>
                 </button>
+                <div class="min-w-0 rounded-md border border-slate-900 bg-slate-950 px-3 py-2 text-white shadow-sm dark:border-slate-800 dark:bg-black sm:col-span-2 sm:px-4 sm:py-3">
+                    <div class="flex items-end justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-medium uppercase tracking-normal text-teal-200">Report progress</p>
+                            <p class="mt-1 text-lg font-semibold tracking-normal sm:text-2xl">{{ $reportRate }}%</p>
+                        </div>
+                        <p class="max-w-52 text-right text-xs leading-5 text-slate-300">{{ number_format($reportTotal) }} reports from {{ number_format($sentTotal) }} sent contacts.</p>
+                    </div>
+                    <div class="mt-3 h-2 rounded-full bg-white/10">
+                        <div class="h-2 rounded-full bg-teal-300" style="width: {{ max(min($reportRate, 100), 2) }}%"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="rounded-md border border-slate-900 bg-slate-950 p-4 text-white shadow-sm dark:border-slate-800 dark:bg-black sm:p-5">
-        <p class="text-sm font-medium text-teal-200">Report progress</p>
-        <div class="mt-4 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <p class="text-4xl font-semibold tracking-normal sm:text-5xl">{{ $reportRate }}%</p>
-            <p class="max-w-44 text-sm leading-5 text-slate-300 sm:max-w-48 sm:leading-6">{{ number_format($reportTotal) }} reports from {{ number_format($sentTotal) }} sent contacts.</p>
+    <section class="rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h3 class="text-base font-semibold text-slate-950 dark:text-white">Date window</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Refine the visible company samples.</p>
+            </div>
+            @if ($dateRange['from'] || $dateRange['to'])
+                <a href="{{ route('dashboard') }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">Clear</a>
+            @endif
         </div>
-        <div class="mt-4 h-2 rounded-full bg-white/10 sm:mt-6">
-            <div class="h-2 rounded-full bg-teal-300" style="width: {{ max(min($reportRate, 100), 2) }}%"></div>
-        </div>
-    </div>
+
+        <form method="GET" action="{{ route('dashboard') }}" class="mt-4 grid gap-3">
+            <div class="grid gap-3">
+                <label class="grid gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    From
+                    <input type="date" name="from" value="{{ $dateRange['from'] }}" class="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-teal-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]">
+                </label>
+                <label class="grid gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    To
+                    <input type="date" name="to" value="{{ $dateRange['to'] }}" class="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-teal-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]">
+                </label>
+            </div>
+            <button type="submit" class="h-10 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">Apply range</button>
+        </form>
+    </section>
 
     <dialog data-email-match-dialog class="fixed inset-0 m-auto max-h-[calc(100vh-2rem)] w-[min(760px,calc(100vw-2rem))] overflow-hidden rounded-md border border-slate-200 bg-white p-0 text-slate-950 shadow-2xl backdrop:bg-slate-950/60 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
         <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 dark:border-slate-800 sm:px-5">

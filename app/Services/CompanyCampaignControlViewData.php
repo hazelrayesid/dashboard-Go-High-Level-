@@ -37,7 +37,7 @@ class CompanyCampaignControlViewData
             'reportTotal' => $groupTotals['Report opened'] ?? 0,
             'remainingTotal' => $groupTotals['Remaining'] ?? 0,
             'reportRate' => $this->reportRate($groupTotals),
-            'prioritySegments' => $allSegments->sortByDesc('total')->take(5),
+            'prioritySegments' => $allSegments->sortByDesc('total')->take(6),
             'companyQueue' => $companyQueue,
             'visibleCompanyCount' => $companyQueue->sum(fn (array $segment): int => count($segment['companies'])),
             'filterOptions' => $this->filterOptions(),

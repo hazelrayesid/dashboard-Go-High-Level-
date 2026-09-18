@@ -53,31 +53,5 @@
             </div>
         </section>
 
-        <section class="rounded-md border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
-            <div class="flex items-start justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-slate-950 dark:text-white">Date window</h3>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Refine the visible company samples.</p>
-                </div>
-                @if ($dateRange['from'] || $dateRange['to'])
-                    <a href="{{ route('dashboard') }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">Clear</a>
-                @endif
-            </div>
-
-            <form method="GET" action="{{ route('dashboard') }}" class="mt-4 grid gap-3">
-                <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-                    <label class="grid gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                        From
-                        <input type="date" name="from" value="{{ $dateRange['from'] }}" class="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-teal-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]">
-                    </label>
-                    <label class="grid gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                        To
-                        <input type="date" name="to" value="{{ $dateRange['to'] }}" class="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-teal-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:[color-scheme:dark]">
-                    </label>
-                </div>
-                <button type="submit" class="h-10 rounded-md bg-slate-950 px-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">Apply range</button>
-            </form>
-        </section>
-
     </aside>
 </section>
