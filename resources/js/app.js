@@ -345,6 +345,34 @@ const initializeCalendarInteractions = () => {
     });
 };
 
+const initializeEmailMatchDialog = () => {
+    const dialog = document.querySelector('[data-email-match-dialog]');
+    const openButton = document.querySelector('[data-email-match-open]');
+
+    if (! dialog || ! openButton) {
+        return;
+    }
+
+    openButton.addEventListener('click', () => {
+        if (typeof dialog.showModal === 'function') {
+            dialog.showModal();
+            return;
+        }
+
+        dialog.setAttribute('open', '');
+    });
+
+    dialog.querySelectorAll('[data-email-match-close]').forEach((button) => {
+        button.addEventListener('click', () => dialog.close());
+    });
+
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) {
+            dialog.close();
+        }
+    });
+};
+
 const initializeDashboardHorizontalScroll = () => {
     const scrollArea = document.querySelector('[data-dashboard-scroll]');
     const control = document.querySelector('[data-mobile-scroll-control]');
@@ -416,4 +444,5 @@ applyFilter('all');
 applyTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 setSidebarCollapsed(window.matchMedia('(min-width: 1280px)').matches && window.localStorage.getItem('companyDashboard.sidebarCollapsed') === 'true');
 initializeCalendarInteractions();
+initializeEmailMatchDialog();
 initializeDashboardHorizontalScroll();
