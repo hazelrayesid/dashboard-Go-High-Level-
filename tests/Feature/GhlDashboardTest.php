@@ -212,6 +212,103 @@ class GhlDashboardTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_dashboard_renders_ghl_email_open_rate_card(): void
+    {
+        $this->withoutVite();
+        $this->bindDashboardContacts();
+
+        config([
+            'services.ghl.base_url' => 'https://services.leadconnectorhq.com',
+            'services.ghl.access_token' => 'fake-token',
+            'services.ghl.email_stats_access_token' => 'fake-email-token',
+            'services.ghl.email_stats_version' => 'v3',
+            'services.ghl.location_id' => 'loc_123',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://services.leadconnectorhq.com/emails/locations/loc_123/campaigns/workflows*' => Http::response([
+                'campaigns' => [
+                    [
+                        'id' => 'workflow_123',
+                        'sourceId' => 'workflow_source_123',
+                        'name' => 'No Website - Plain',
+                        'status' => 'published',
+                        'updatedAt' => '2026-09-18T09:00:00.000Z',
+                    ],
+                ],
+                'total' => 1,
+            ]),
+            'https://services.leadconnectorhq.com/emails/locations/loc_123/campaigns/stats/workflow-campaigns/workflow_source_123' => Http::response([
+                'stats' => [
+                    'sent' => 89134,
+                    'delivered' => 58927,
+                    'opened' => 10258,
+                    'unsubscribed' => 177,
+                    'complained' => 18,
+                    'permanentFail' => 1200,
+                    'temporaryFail' => 800,
+                    'rejected' => 200,
+                    'failed' => 89,
+                ],
+            ]),
+        ]);
+
+        $response = $this->get('/?email_from=2026-09-15&email_to=2026-09-20');
+
+        $response
+            ->assertOk()
+            ->assertSee('Performance Analysis')
+            ->assertSee('Open Rate (for All Campaigns)')
+            ->assertSee('58,927')
+            ->assertSee('2,289')
+            ->assertSee('17.41%')
+            ->assertSee('10,258')
+            ->assertSee('1 campaign stats loaded');
+    }
+
+    public function test_dashboard_aggregates_workflow_email_action_stats(): void
+    {
+        $this->withoutVite();
+        $this->bindDashboardContacts();
+
+        config([
+            'services.ghl.base_url' => 'https://services.leadconnectorhq.com',
+            'services.ghl.access_token' => 'fake-token',
+            'services.ghl.email_stats_access_token' => 'fake-email-token',
+            'services.ghl.email_stats_version' => 'v3',
+            'services.ghl.location_id' => 'loc_123',
+        ]);
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://services.leadconnectorhq.com/emails/locations/loc_123/campaigns/workflows*' => Http::response([
+                'campaigns' => [
+                    [
+                        'id' => 'workflow_123',
+                        'sourceId' => 'workflow_source_123',
+                        'name' => 'No Website - Plain',
+                        'status' => 'published',
+                        'updatedAt' => '2026-09-18T09:00:00.000Z',
+                    ],
+                ],
+                'total' => 1,
+            ]),
+            'https://services.leadconnectorhq.com/emails/locations/loc_123/campaigns/stats/workflow-campaigns/workflow_source_123' => Http::response([
+                'stats' => ['delivered' => 150, 'opened' => 40],
+            ]),
+        ]);
+
+        $response = $this->get('/?email_from=2026-09-16&email_to=2026-09-21');
+
+        $response
+            ->assertOk()
+            ->assertSee('150')
+            ->assertSee('26.67%')
+            ->assertSee('40')
+            ->assertSee('1 campaign stats loaded');
+    }
+
     public function test_ghl_client_uses_recent_cache_when_connection_times_out(): void
     {
         config([

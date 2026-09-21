@@ -9,11 +9,12 @@ class CompanyCampaignControlViewData
     /**
      * @param  array<string, mixed>  $dashboard
      * @param  array{from?: string|null, to?: string|null}  $dateRange
+     * @param  array<string, mixed>  $emailStats
      * @param  array<string, mixed>  $googleCalendar
      * @param  array{pending: int, failed: int, contacts: int, active_contacts: int, stale_contacts?: int, is_running?: bool, cursor?: array<string, mixed>|null}  $syncStatus
      * @return array<string, mixed>
      */
-    public function make(array $dashboard, array $dateRange, array $googleCalendar, array $syncStatus): array
+    public function make(array $dashboard, array $dateRange, array $emailStats, array $googleCalendar, array $syncStatus): array
     {
         $groups = $dashboard['groups'];
         $totals = $dashboard['totals'];
@@ -27,6 +28,7 @@ class CompanyCampaignControlViewData
         return [
             'dashboard' => $dashboard,
             'dateRange' => $dateRange,
+            'emailStats' => $emailStats,
             'googleCalendar' => $googleCalendar,
             'syncStatus' => $syncStatus,
             'groups' => $groups,

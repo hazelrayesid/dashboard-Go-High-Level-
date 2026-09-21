@@ -403,6 +403,187 @@ const initializeDashboardHorizontalScroll = () => {
     refresh();
 };
 
+const initializeDateControls = () => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+    });
+
+    document.querySelectorAll('[data-date-shell]').forEach((shell) => {
+        const button = shell.querySelector('[data-date-button]');
+        const input = shell.querySelector('[data-date-input]');
+        const label = shell.querySelector('[data-date-label]');
+
+        if (! button || ! input || ! label || shell.dataset.bound === 'true') {
+            return;
+        }
+
+        shell.dataset.bound = 'true';
+
+        const updateLabel = () => {
+            if (! input.value) {
+                return;
+            }
+
+            label.textContent = formatter.format(new Date(`${input.value}T00:00:00`));
+        };
+
+        button.addEventListener('click', () => {
+            if (typeof input.showPicker === 'function') {
+                input.showPicker();
+                return;
+            }
+
+            input.click();
+        });
+
+        input.addEventListener('change', updateLabel);
+        updateLabel();
+    });
+};
+
+const initializeEmailMetricControls = () => {
+    const formatter = new Intl.NumberFormat('en-US');
+
+    document.querySelectorAll('[data-email-performance-card]').forEach((card) => {
+        const dataElement = card.querySelector('[data-email-metric-data]');
+
+        if (! dataElement || card.dataset.metricBound === 'true') {
+            return;
+        }
+
+        card.dataset.metricBound = 'true';
+
+        let state;
+
+        try {
+            state = JSON.parse(dataElement.textContent || '{}');
+        } catch {
+            return;
+        }
+
+        const metricOptions = state.metrics || {};
+        const points = state.points || [];
+        const chart = state.chart || {};
+        const plotLeft = Number(chart.plot_left || 46);
+        const plotRight = Number(chart.plot_right || 884);
+        const plotBottom = Number(chart.plot_bottom || 178);
+        const plotHeight = Number(chart.plot_height || 160);
+        const title = card.querySelector('[data-email-metric-title]');
+        const current = card.querySelector('[data-email-metric-current]');
+        const label = card.querySelector('[data-email-metric-label]');
+        const value = card.querySelector('[data-email-metric-value]');
+        const rows = card.querySelector('[data-email-metric-rows]');
+        const area = card.querySelector('[data-email-area]');
+        const line = card.querySelector('[data-email-line]');
+        const axis = card.querySelector('[data-email-axis-label]');
+        const svg = card.querySelector('[data-email-chart]');
+        const details = card.querySelector('details');
+
+        const formatValue = (number, unit = '') => unit === '%'
+            ? `${Number(number || 0).toFixed(2)}%`
+            : formatter.format(Math.round(Number(number || 0)));
+
+        const pointPath = (metric) => {
+            const key = metric.point_key;
+            const maxPoint = points.reduce((max, point) => Math.max(max, Number(point[key] || 0)), 0);
+            const tickMax = Math.max(Number(metric.tick_min || 5), Math.ceil(Math.max(maxPoint, Number(metric.value || 0)) / 5) * 5 || 5);
+            const count = Math.max(points.length, 1);
+            const coords = points.map((point, index) => {
+                const x = count === 1 ? (plotLeft + plotRight) / 2 : plotLeft + ((plotRight - plotLeft) * (index / (count - 1)));
+                const y = plotBottom - (plotHeight * Math.min(Number(point[key] || 0), tickMax) / tickMax);
+
+                return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
+            });
+
+            if (coords.length === 0) {
+                return { linePath: '', areaPath: '', tickMax };
+            }
+
+            let linePath = `M ${coords[0].x} ${coords[0].y}`;
+
+            for (let index = 1; index < coords.length; index++) {
+                const previous = coords[index - 1];
+                const currentPoint = coords[index];
+                const controlX = Number(((previous.x + currentPoint.x) / 2).toFixed(2));
+
+                linePath += ` C ${controlX} ${previous.y} ${controlX} ${currentPoint.y} ${currentPoint.x} ${currentPoint.y}`;
+            }
+
+            const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${plotBottom} L ${coords[0].x} ${plotBottom} Z`;
+
+            return { linePath, areaPath, tickMax };
+        };
+
+        const setActiveOption = (metricKey) => {
+            card.querySelectorAll('[data-email-metric-option]').forEach((option) => {
+                const isActive = option.dataset.emailMetricOption === metricKey;
+
+                option.classList.toggle('bg-slate-50', isActive);
+                option.classList.toggle('font-medium', isActive);
+                option.classList.toggle('text-blue-600', isActive);
+                option.classList.toggle('dark:bg-slate-900', isActive);
+                option.classList.toggle('dark:text-blue-300', isActive);
+                option.classList.toggle('hover:bg-slate-50', ! isActive);
+                option.classList.toggle('dark:hover:bg-slate-900', ! isActive);
+                option.querySelector('[data-email-metric-check]')?.classList.toggle('hidden', ! isActive);
+            });
+        };
+
+        const renderMetric = (metricKey, updateUrl = true) => {
+            const metric = metricOptions[metricKey] || metricOptions.open_rate;
+
+            if (! metric) {
+                return;
+            }
+
+            title.textContent = `${metric.label} (for All Campaigns)`;
+            current.textContent = metric.label;
+            label.textContent = metric.label;
+            value.textContent = formatValue(metric.value, metric.unit);
+            axis.textContent = metric.label;
+            svg?.setAttribute('aria-label', `${metric.label} chart`);
+
+            rows.innerHTML = Object.entries(metric.rows || {}).map(([rowLabel, rowValue]) => `
+                <div class="flex items-center justify-between gap-3">
+                    <span class="text-slate-600 dark:text-slate-400">${escapeHtml(rowLabel)}</span>
+                    <span class="font-medium text-slate-800 dark:text-slate-200">${formatter.format(Math.round(Number(rowValue || 0)))}</span>
+                </div>
+            `).join('') + `<p class="text-xs text-slate-400 dark:text-slate-500">${formatter.format(Number(state.stats_count || 0))} campaign stats loaded</p>`;
+
+            const paths = pointPath(metric);
+            area?.setAttribute('d', paths.areaPath);
+            line?.setAttribute('d', paths.linePath);
+
+            card.querySelectorAll('[data-email-y-tick]').forEach((tick) => {
+                const index = Number(tick.dataset.emailYTick || 0);
+                const tickValue = Math.round((paths.tickMax / 5) * index);
+
+                tick.textContent = `${formatter.format(tickValue)}${metric.unit || ''}`;
+            });
+
+            setActiveOption(metricKey);
+            details?.removeAttribute('open');
+
+            if (updateUrl) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('email_metric', metricKey);
+                window.history.replaceState({}, '', url);
+            }
+        };
+
+        card.querySelectorAll('[data-email-metric-option]').forEach((option) => {
+            option.addEventListener('click', (event) => {
+                event.preventDefault();
+                renderMetric(option.dataset.emailMetricOption || 'open_rate');
+            });
+        });
+
+        renderMetric(state.active || 'open_rate', false);
+    });
+};
+
 document.querySelectorAll('[data-filter-button]').forEach((button) => {
     button.addEventListener('click', () => applyFilter(button.dataset.filterButton ?? 'all'));
 });
@@ -446,3 +627,5 @@ setSidebarCollapsed(window.matchMedia('(min-width: 1280px)').matches && window.l
 initializeCalendarInteractions();
 initializeEmailMatchDialog();
 initializeDashboardHorizontalScroll();
+initializeDateControls();
+initializeEmailMetricControls();
