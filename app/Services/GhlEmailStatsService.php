@@ -15,6 +15,10 @@ class GhlEmailStatsService
         'Top4 Signup - No Website - Plain',
         'No Website - Plain',
         'Followup after open',
+        'Has Website - Plain',
+        'Has Website - Styled',
+        'No Website - Styled',
+        'Top4 Signup - Has Website - Plain',
     ];
 
     public function __construct(
@@ -39,6 +43,7 @@ class GhlEmailStatsService
             'location_id' => config('services.ghl.location_id'),
             'version' => config('services.ghl.email_stats_version'),
             'range' => $window,
+            'workflow_names' => self::FOCUSED_WORKFLOW_NAMES,
         ]));
 
         return Cache::remember($cacheKey, now()->addMinute(), function () use ($window, $empty): array {
