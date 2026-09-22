@@ -38,7 +38,7 @@
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-950 text-sm font-bold text-white dark:bg-white dark:text-slate-950">14</span>
+                        <span class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-950 text-sm font-bold text-white dark:bg-white dark:text-slate-950">12</span>
                         <div>
                             <h3 class="text-base font-semibold text-slate-950 dark:text-white">Google Calendar scheduling</h3>
                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Upcoming calendar context before working the company queue.</p>
