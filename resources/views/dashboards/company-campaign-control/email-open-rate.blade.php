@@ -278,18 +278,18 @@
         </div>
 
         @if ($emailBreakdown->isNotEmpty())
-            <div class="mt-5 border-t border-slate-100 pt-5 dark:border-slate-800">
+            <div data-email-breakdown class="mt-5 border-t border-slate-100 pt-5 dark:border-slate-800">
                 <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <h5 class="text-sm font-semibold text-slate-950 dark:text-white">Campaign breakdown</h5>
                         <p class="text-xs text-slate-500 dark:text-slate-400">Workflow campaign engagement summary from HighLevel campaign stats.</p>
                     </div>
-                    <span class="text-xs font-medium text-slate-400 dark:text-slate-500">{{ number_format($emailBreakdown->count()) }} email action{{ $emailBreakdown->count() === 1 ? '' : 's' }}</span>
+                    <span data-email-breakdown-count class="text-xs font-medium text-slate-400 dark:text-slate-500">{{ number_format($emailBreakdown->count()) }} email action{{ $emailBreakdown->count() === 1 ? '' : 's' }}</span>
                 </div>
 
                 <div class="mt-3 overflow-hidden rounded-md border border-slate-200 dark:border-slate-800">
                     @foreach ($emailBreakdown as $item)
-                        <article class="grid gap-4 border-b border-slate-100 bg-white px-4 py-4 last:border-b-0 dark:border-slate-800 dark:bg-slate-950/40 xl:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)] xl:items-center">
+                        <article data-email-breakdown-row class="grid gap-4 border-b border-slate-100 bg-white px-4 py-4 last:border-b-0 dark:border-slate-800 dark:bg-slate-950/40 xl:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)] xl:items-center">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="rounded-md bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-200">{{ $item['source_label'] }}</span>
@@ -319,6 +319,14 @@
                             </div>
                         </article>
                     @endforeach
+                </div>
+
+                <div data-email-breakdown-pagination class="hidden flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p data-email-breakdown-pagination-label class="text-xs text-slate-500 dark:text-slate-400">Page 1 of 1 - 5 per page</p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" data-email-breakdown-prev class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-800 disabled:border-slate-100 disabled:text-slate-300 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300 dark:disabled:text-slate-600">Previous</button>
+                        <button type="button" data-email-breakdown-next class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-800 disabled:border-slate-100 disabled:text-slate-300 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300 dark:disabled:text-slate-600">Next page</button>
+                    </div>
                 </div>
             </div>
         @endif

@@ -584,6 +584,67 @@ const initializeEmailMetricControls = () => {
     });
 };
 
+const initializeEmailBreakdownPagination = () => {
+    const pageSize = 5;
+
+    document.querySelectorAll('[data-email-breakdown]').forEach((root) => {
+        const rows = Array.from(root.querySelectorAll('[data-email-breakdown-row]'));
+        const pagination = root.querySelector('[data-email-breakdown-pagination]');
+        const label = root.querySelector('[data-email-breakdown-pagination-label]');
+        const count = root.querySelector('[data-email-breakdown-count]');
+        const previous = root.querySelector('[data-email-breakdown-prev]');
+        const next = root.querySelector('[data-email-breakdown-next]');
+        let page = 1;
+
+        if (rows.length <= pageSize) {
+            return;
+        }
+
+        const render = () => {
+            const lastPage = Math.max(Math.ceil(rows.length / pageSize), 1);
+            page = Math.min(Math.max(page, 1), lastPage);
+
+            const start = (page - 1) * pageSize;
+            const end = start + pageSize;
+
+            rows.forEach((row, index) => {
+                row.hidden = index < start || index >= end;
+            });
+
+            pagination?.classList.remove('hidden');
+            pagination?.classList.add('flex');
+
+            if (label) {
+                label.textContent = `Page ${page} of ${lastPage} - ${pageSize} per page`;
+            }
+
+            if (count) {
+                count.textContent = `${start + 1}-${Math.min(end, rows.length)} of ${rows.length} email actions`;
+            }
+
+            if (previous) {
+                previous.disabled = page <= 1;
+            }
+
+            if (next) {
+                next.disabled = page >= lastPage;
+            }
+        };
+
+        previous?.addEventListener('click', () => {
+            page -= 1;
+            render();
+        });
+
+        next?.addEventListener('click', () => {
+            page += 1;
+            render();
+        });
+
+        render();
+    });
+};
+
 document.querySelectorAll('[data-filter-button]').forEach((button) => {
     button.addEventListener('click', () => applyFilter(button.dataset.filterButton ?? 'all'));
 });
@@ -629,3 +690,4 @@ initializeEmailMatchDialog();
 initializeDashboardHorizontalScroll();
 initializeDateControls();
 initializeEmailMetricControls();
+initializeEmailBreakdownPagination();
