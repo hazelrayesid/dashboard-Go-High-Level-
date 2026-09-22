@@ -240,8 +240,9 @@
                 </div>
             </aside>
 
-            <div class="min-w-0 overflow-x-auto">
-                <svg data-email-chart viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" role="img" aria-label="{{ $activeMetric['label'] }} chart" class="h-[270px] min-w-[620px] w-full">
+            <div data-email-chart-wrap class="relative min-w-0">
+                <div class="overflow-x-auto">
+                    <svg data-email-chart viewBox="0 0 {{ $chartWidth }} {{ $chartHeight }}" role="img" aria-label="{{ $activeMetric['label'] }} chart" class="h-[270px] min-w-[620px] w-full">
                     @foreach ($chartTicks as $tick)
                         @php
                             $tickY = $plotBottom - ($plotHeight * ($tick / $tickMax));
@@ -254,6 +255,11 @@
                         <path data-email-area d="{{ $areaPath }}" fill="#e8e7f4" class="dark:fill-slate-800" opacity="0.9" />
                         <path data-email-line d="{{ $linePath }}" fill="none" stroke="#687291" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
                     @endif
+                    <g data-email-points>
+                        @foreach ($pathPoints as $index => $point)
+                            <circle data-email-point="{{ $index }}" cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="4" fill="#687291" stroke="white" stroke-width="2" class="transition-all duration-150 dark:stroke-slate-950" />
+                        @endforeach
+                    </g>
 
                     <line x1="{{ $plotLeft }}" y1="{{ $plotBottom }}" x2="{{ $plotRight }}" y2="{{ $plotBottom }}" stroke="#2dd4bf" stroke-width="2" />
                     <text data-email-axis-label x="4" y="106" transform="rotate(-90 4 106)" class="fill-slate-500 text-[12px] dark:fill-slate-400">{{ $activeMetric['label'] }}</text>
@@ -265,7 +271,9 @@
                         <text x="{{ $x }}" y="206" text-anchor="middle" class="fill-slate-500 text-[12px] dark:fill-slate-400">{{ $point['label'] }}</text>
                     @endforeach
                     <text x="442" y="220" text-anchor="middle" class="fill-slate-500 text-[12px] dark:fill-slate-400">Dates</text>
-                </svg>
+                    </svg>
+                </div>
+                <div data-email-chart-tooltip class="pointer-events-none absolute z-30 hidden max-w-xs rounded-md bg-slate-950 px-3 py-2 text-xs text-white shadow-xl ring-1 ring-black/10 dark:bg-slate-950"></div>
 
                 <div class="mt-1 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-600 dark:text-slate-400">
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 bg-[#687291]"></span>All Campaigns</span>
