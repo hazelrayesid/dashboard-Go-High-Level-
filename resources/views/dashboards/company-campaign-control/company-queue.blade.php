@@ -27,8 +27,10 @@
                     <div class="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
                         @foreach ($segment['companies'] as $company)
                             @php
-                                $businessValue = $company['business'];
-                                $websiteUrl = str_starts_with($businessValue, 'http') ? $businessValue : 'https://'.$businessValue;
+                                $websiteValue = trim((string) ($company['website'] ?? ''));
+                                $websiteUrl = $websiteValue !== '' && ! preg_match('/\s/', $websiteValue)
+                                    ? (preg_match('/^https?:\/\//i', $websiteValue) ? $websiteValue : 'https://'.$websiteValue)
+                                    : null;
                                 $createdDate = $company['created_date'] ?? '';
                             @endphp
 
@@ -51,7 +53,9 @@
                                 </div>
 
                                 <div class="mt-3 flex items-center gap-2 sm:mt-4">
-                                    <a href="{{ $websiteUrl }}" target="_blank" rel="noreferrer" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">Website</a>
+                                    @if ($websiteUrl)
+                                        <a href="{{ $websiteUrl }}" target="_blank" rel="noreferrer" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">Website</a>
+                                    @endif
                                     <button type="button" data-copy-value="{{ $company['email'] }}" class="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">Copy email</button>
                                 </div>
                             </article>

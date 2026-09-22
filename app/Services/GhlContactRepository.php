@@ -82,6 +82,7 @@ class GhlContactRepository
             'email' => $contact->email,
             'phone' => $contact->phone,
             'businessName' => $contact->business,
+            'website' => $contact->website,
             'dateAdded' => $contact->created_at_ghl?->toISOString() ?? $contact->created_date?->toDateString(),
             'tags' => $contact->tags ?? [],
             'customFields' => $contact->custom_fields ?? [],

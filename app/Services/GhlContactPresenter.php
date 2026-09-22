@@ -71,6 +71,9 @@ class GhlContactPresenter
                 ?? Arr::get($contact, 'company.name')
                 ?? Arr::get($contact, 'website')
                 ?? '-'),
+            'website' => (string) (Arr::get($contact, 'website')
+                ?? Arr::get($contact, 'websiteUrl')
+                ?? ''),
             'created_at' => $createdAt,
             'created_date' => $this->dateRange->dateOnly($createdAt),
             'tags' => collect(Arr::get($contact, 'tags', []))
