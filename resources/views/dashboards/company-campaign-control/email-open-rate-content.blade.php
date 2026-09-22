@@ -1,4 +1,19 @@
 <section data-email-performance-card class="rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <script type="application/json" data-email-metric-data>
+        {!! json_encode([
+            'active' => $activeMetricKey,
+            'stats_count' => $emailStats['stats_count'] ?? 0,
+            'metrics' => collect($metricOptions)->map(fn (array $option): array => [
+                'label' => $option['label'],
+                'unit' => $option['unit'],
+                'value' => $option['value'],
+                'breakdown_key' => $option['breakdown_key'],
+                'tick_min' => $option['tick_min'],
+                'rows' => $option['rows'],
+            ])->all(),
+            'breakdown' => $emailBreakdown->values()->all(),
+        ]) !!}
+    </script>
     <div class="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -10,9 +25,9 @@
             </div>
 
             <div class="grid gap-2 lg:justify-items-end">
-                <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+                {{-- <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
                     Snapshot summary from selected workflows. Refreshed from HighLevel every minute.
-                </div>
+                </div> --}}
 
                 @if ($workflowOptions->isNotEmpty())
                     <details class="group relative w-full sm:w-[460px]">
@@ -67,8 +82,8 @@
 
     <div class="p-4 sm:p-6">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h4 class="text-base font-semibold text-slate-950 dark:text-white">{{ $activeMetric['label'] }} by selected workflow</h4>
-            <details class="group relative sm:min-w-48">
+            <h4 data-email-metric-title class="text-base font-semibold text-slate-950 dark:text-white">{{ $activeMetric['label'] }} by selected workflow</h4>
+            <details data-email-metric-dropdown class="group relative sm:min-w-48">
                 <summary class="flex h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm outline-none hover:border-slate-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:focus:ring-blue-500/10">
                     <span data-email-metric-current>{{ $activeMetric['label'] }}</span>
                     <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" class="h-4 w-4 text-slate-400 dark:text-slate-500">
@@ -81,7 +96,7 @@
                             $metricUrl = route('dashboard', array_merge($metricBaseQuery, ['email_metric' => $metricKey]));
                             $isActiveMetric = $activeMetricKey === $metricKey;
                         @endphp
-                        <a href="{{ $metricUrl }}" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left {{ $isActiveMetric ? 'bg-slate-50 font-medium text-blue-600 dark:bg-slate-900 dark:text-blue-300' : 'hover:bg-slate-50 dark:hover:bg-slate-900' }}">
+                        <a href="{{ $metricUrl }}" data-email-metric-option="{{ $metricKey }}" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left {{ $isActiveMetric ? 'bg-slate-50 font-medium text-blue-600 dark:bg-slate-900 dark:text-blue-300' : 'hover:bg-slate-50 dark:hover:bg-slate-900' }}">
                             <span>{{ $metricOption['label'] }}</span>
                             <svg data-email-metric-check aria-hidden="true" viewBox="0 0 20 20" fill="none" class="h-4 w-4 {{ $isActiveMetric ? '' : 'hidden' }}">
                                 <path d="M15.5 5.75 8.25 13 4.5 9.25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
@@ -101,12 +116,12 @@
         <div class="mt-5 grid gap-4 lg:grid-cols-[224px_minmax(0,1fr)] lg:items-stretch">
             <aside class="rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/50">
                 <div class="px-4 py-8">
-                    <p class="text-sm font-medium text-slate-600 dark:text-slate-400">{{ $activeMetric['label'] }}</p>
-                    <p class="mt-1 text-4xl font-semibold tracking-normal text-slate-950 dark:text-white">
+                    <p data-email-metric-label class="text-sm font-medium text-slate-600 dark:text-slate-400">{{ $activeMetric['label'] }}</p>
+                    <p data-email-metric-value class="mt-1 text-4xl font-semibold tracking-normal text-slate-950 dark:text-white">
                         {{ $isRateMetric ? number_format((float) $activeMetric['value'], 2) : number_format((int) $activeMetric['value']) }}{{ $activeMetric['unit'] }}
                     </p>
                 </div>
-                <div class="grid gap-3 border-t border-slate-100 px-4 py-6 text-sm dark:border-slate-800">
+                <div data-email-metric-rows class="grid gap-3 border-t border-slate-100 px-4 py-6 text-sm dark:border-slate-800">
                     @foreach ($activeMetric['rows'] as $rowLabel => $rowValue)
                         <div class="flex items-center justify-between gap-3">
                             <span class="text-slate-600 dark:text-slate-400">{{ $rowLabel }}</span>
@@ -123,10 +138,10 @@
                         <p class="text-sm font-semibold text-slate-950 dark:text-white">Workflow comparison</p>
                         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">This is a campaign summary comparison, not a daily trend.</p>
                     </div>
-                    <span class="shrink-0 text-xs font-medium text-slate-400 dark:text-slate-500">{{ number_format($chartRows->count()) }} workflows</span>
+                    <span data-email-chart-count class="shrink-0 text-xs font-medium text-slate-400 dark:text-slate-500">{{ number_format($chartRows->count()) }} workflows</span>
                 </div>
 
-                <div class="mt-4 grid gap-3">
+                <div data-email-chart-bars class="mt-4 grid gap-3">
                     @forelse ($chartRows as $item)
                         @php
                             $metricValue = (float) ($item[$activeMetric['breakdown_key']] ?? 0);

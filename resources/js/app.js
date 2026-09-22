@@ -464,88 +464,19 @@ const initializeEmailMetricControls = () => {
         }
 
         const metricOptions = state.metrics || {};
-        const points = state.points || [];
-        const chart = state.chart || {};
-        const plotLeft = Number(chart.plot_left || 46);
-        const plotRight = Number(chart.plot_right || 884);
-        const plotBottom = Number(chart.plot_bottom || 178);
-        const plotHeight = Number(chart.plot_height || 160);
+        const breakdown = state.breakdown || [];
         const title = card.querySelector('[data-email-metric-title]');
         const current = card.querySelector('[data-email-metric-current]');
         const label = card.querySelector('[data-email-metric-label]');
         const value = card.querySelector('[data-email-metric-value]');
         const rows = card.querySelector('[data-email-metric-rows]');
-        const area = card.querySelector('[data-email-area]');
-        const line = card.querySelector('[data-email-line]');
-        const axis = card.querySelector('[data-email-axis-label]');
-        const svg = card.querySelector('[data-email-chart]');
-        const pointLayer = card.querySelector('[data-email-points]');
-        const chartWrap = card.querySelector('[data-email-chart-wrap]');
-        const tooltip = card.querySelector('[data-email-chart-tooltip]');
-        const details = card.querySelector('details');
-        let activeMetricKey = state.active || 'open_rate';
-        let activeCoords = [];
+        const bars = card.querySelector('[data-email-chart-bars]');
+        const count = card.querySelector('[data-email-chart-count]');
+        const details = card.querySelector('[data-email-metric-dropdown]');
 
         const formatValue = (number, unit = '') => unit === '%'
             ? `${Number(number || 0).toFixed(2)}%`
             : formatter.format(Math.round(Number(number || 0)));
-
-        const metricNumerator = (point, metricKey) => {
-            if (metricKey === 'click_rate') {
-                return Number(point.clicked || 0);
-            }
-
-            if (metricKey === 'open_rate') {
-                return Number(point.opened || 0);
-            }
-
-            return Number(point[metricOptions[metricKey]?.point_key] || 0);
-        };
-
-        const tooltipMetricText = (metricKey, point, valueNumber) => {
-            const metric = metricOptions[metricKey] || metricOptions.open_rate;
-
-            if (metric?.unit === '%') {
-                const numerator = metricNumerator(point, metricKey);
-                const delivered = Number(point.delivered || 0);
-                const noun = metricKey === 'click_rate' ? 'clicked' : 'opened';
-
-                return `${formatValue(valueNumber, '%')} (${formatter.format(numerator)} ${noun} / ${formatter.format(delivered)} deliveries)`;
-            }
-
-            return formatValue(valueNumber, metric?.unit || '');
-        };
-
-        const pointPath = (metric) => {
-            const key = metric.point_key;
-            const maxPoint = points.reduce((max, point) => Math.max(max, Number(point[key] || 0)), 0);
-            const tickMax = Math.max(Number(metric.tick_min || 5), Math.ceil(Math.max(maxPoint, Number(metric.value || 0)) / 5) * 5 || 5);
-            const count = Math.max(points.length, 1);
-            const coords = points.map((point, index) => {
-                const x = count === 1 ? (plotLeft + plotRight) / 2 : plotLeft + ((plotRight - plotLeft) * (index / (count - 1)));
-                const y = plotBottom - (plotHeight * Math.min(Number(point[key] || 0), tickMax) / tickMax);
-
-                return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
-            });
-
-            if (coords.length === 0) {
-                return { linePath: '', areaPath: '', tickMax, coords: [] };
-            }
-
-            let linePath = `M ${coords[0].x} ${coords[0].y}`;
-
-            for (let index = 1; index < coords.length; index++) {
-                const previous = coords[index - 1];
-                const currentPoint = coords[index];
-                const controlX = Number(((previous.x + currentPoint.x) / 2).toFixed(2));
-
-                linePath += ` C ${controlX} ${previous.y} ${controlX} ${currentPoint.y} ${currentPoint.x} ${currentPoint.y}`;
-            }
-
-            const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${plotBottom} L ${coords[0].x} ${plotBottom} Z`;
-
-            return { linePath, areaPath, tickMax, coords };
-        };
 
         const setActiveOption = (metricKey) => {
             card.querySelectorAll('[data-email-metric-option]').forEach((option) => {
@@ -562,6 +493,58 @@ const initializeEmailMetricControls = () => {
             });
         };
 
+        const metricRows = (metric) => Object.entries(metric.rows || {}).map(([rowLabel, rowValue]) => `
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-slate-600 dark:text-slate-400">${escapeHtml(rowLabel)}</span>
+                <span class="font-medium text-slate-800 dark:text-slate-200">${formatter.format(Math.round(Number(rowValue || 0)))}</span>
+            </div>
+        `).join('') + `<p class="text-xs text-slate-400 dark:text-slate-500">${formatter.format(Number(state.stats_count || 0))} campaign stats loaded</p>`;
+
+        const metricItems = (metric) => {
+            const key = metric.breakdown_key;
+            const items = breakdown
+                .filter((item) => Number(item[key] || 0) > 0 || Number(item.delivered || 0) > 0)
+                .sort((first, second) => Number(second[key] || 0) - Number(first[key] || 0));
+            const max = Math.max(Number(metric.tick_min || 5), ...items.map((item) => Number(item[key] || 0)), 1);
+
+            return { items, max };
+        };
+
+        const renderBars = (metric) => {
+            if (! bars) {
+                return;
+            }
+
+            const { items, max } = metricItems(metric);
+
+            if (count) {
+                count.textContent = `${formatter.format(items.length)} workflows`;
+            }
+
+            if (items.length === 0) {
+                bars.innerHTML = `<div class="rounded-md border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    No workflow stats loaded yet.
+                </div>`;
+                return;
+            }
+
+            bars.innerHTML = items.map((item) => {
+                const metricValue = Number(item[metric.breakdown_key] || 0);
+                const barWidth = max > 0 ? Math.min(100, Math.max(1, (metricValue / max) * 100)) : 0;
+
+                return `<div class="grid gap-2 sm:grid-cols-[minmax(180px,260px)_minmax(0,1fr)_90px] sm:items-center">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100" title="${escapeHtml(item.campaign_name)}">${escapeHtml(item.campaign_name)}</p>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">${formatter.format(Number(item.opened || 0))} opened / ${formatter.format(Number(item.delivered || 0))} delivered</p>
+                    </div>
+                    <div class="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div class="h-full rounded-full bg-[#687291]" style="width: ${barWidth}%"></div>
+                    </div>
+                    <p class="text-right text-sm font-semibold text-slate-950 dark:text-white">${formatValue(metricValue, metric.unit)}</p>
+                </div>`;
+            }).join('');
+        };
+
         const renderMetric = (metricKey, updateUrl = true) => {
             const metric = metricOptions[metricKey] || metricOptions.open_rate;
 
@@ -569,39 +552,12 @@ const initializeEmailMetricControls = () => {
                 return;
             }
 
-            title.textContent = `${metric.label} (for All Campaigns)`;
+            title.textContent = `${metric.label} by selected workflow`;
             current.textContent = metric.label;
             label.textContent = metric.label;
             value.textContent = formatValue(metric.value, metric.unit);
-            axis.textContent = metric.label;
-            svg?.setAttribute('aria-label', `${metric.label} chart`);
-
-            rows.innerHTML = Object.entries(metric.rows || {}).map(([rowLabel, rowValue]) => `
-                <div class="flex items-center justify-between gap-3">
-                    <span class="text-slate-600 dark:text-slate-400">${escapeHtml(rowLabel)}</span>
-                    <span class="font-medium text-slate-800 dark:text-slate-200">${formatter.format(Math.round(Number(rowValue || 0)))}</span>
-                </div>
-            `).join('') + `<p class="text-xs text-slate-400 dark:text-slate-500">${formatter.format(Number(state.stats_count || 0))} campaign stats loaded</p>`;
-
-            activeMetricKey = metricKey;
-            const paths = pointPath(metric);
-            activeCoords = paths.coords || [];
-            area?.setAttribute('d', paths.areaPath);
-            line?.setAttribute('d', paths.linePath);
-
-            if (pointLayer) {
-                pointLayer.innerHTML = activeCoords.map((coord, index) => `
-                    <circle data-email-point="${index}" cx="${coord.x}" cy="${coord.y}" r="4" fill="#687291" stroke="white" stroke-width="2" class="transition-all duration-150 dark:stroke-slate-950"></circle>
-                `).join('');
-            }
-
-            card.querySelectorAll('[data-email-y-tick]').forEach((tick) => {
-                const index = Number(tick.dataset.emailYTick || 0);
-                const tickValue = Math.round((paths.tickMax / 5) * index);
-
-                tick.textContent = `${formatter.format(tickValue)}${metric.unit || ''}`;
-            });
-
+            rows.innerHTML = metricRows(metric);
+            renderBars(metric);
             setActiveOption(metricKey);
             details?.removeAttribute('open');
 
@@ -612,75 +568,6 @@ const initializeEmailMetricControls = () => {
             }
         };
 
-        const renderTooltip = (event) => {
-            if (! svg || ! tooltip || ! chartWrap || activeCoords.length === 0 || points.length === 0) {
-                return;
-            }
-
-            const metric = metricOptions[activeMetricKey] || metricOptions.open_rate;
-            const key = metric?.point_key || 'open_rate';
-            const rect = svg.getBoundingClientRect();
-            const viewBox = svg.viewBox.baseVal;
-            const pointerX = viewBox.x + ((event.clientX - rect.left) / rect.width) * viewBox.width;
-            const nearestIndex = activeCoords.reduce((nearest, coord, index) => {
-                const currentDistance = Math.abs(coord.x - pointerX);
-                const nearestDistance = Math.abs(activeCoords[nearest].x - pointerX);
-
-                return currentDistance < nearestDistance ? index : nearest;
-            }, 0);
-            const nearestCoord = activeCoords[nearestIndex];
-            const interval = activeCoords.length > 1
-                ? Math.abs(activeCoords[1].x - activeCoords[0].x)
-                : 48;
-            const hoverDistance = Math.abs(nearestCoord.x - pointerX);
-            const hoverRange = Math.min(Math.max(interval / 2, 24), 72);
-
-            if (hoverDistance > hoverRange) {
-                tooltip.classList.add('hidden');
-                pointLayer?.querySelectorAll('[data-email-point]').forEach((pointElement) => {
-                    pointElement.setAttribute('r', '4');
-                    pointElement.setAttribute('opacity', '1');
-                });
-                return;
-            }
-
-            pointLayer?.querySelectorAll('[data-email-point]').forEach((pointElement) => {
-                const isActivePoint = pointElement.dataset.emailPoint === String(nearestIndex);
-
-                pointElement.setAttribute('r', isActivePoint ? '6' : '4');
-                pointElement.setAttribute('opacity', isActivePoint ? '1' : '0.85');
-            });
-
-            const point = points[nearestIndex] || {};
-            const valueNumber = Number(point[key] || 0);
-            const zeroText = tooltipMetricText(activeMetricKey, { delivered: 0, opened: 0, clicked: 0 }, 0);
-            const workflowText = tooltipMetricText(activeMetricKey, point, valueNumber);
-            const rowsHtml = [
-                ['#3b82f6', 'Email Campaign', zeroText],
-                ['#a78bfa', 'Workflow Campaign', workflowText],
-                ['#38bdf8', 'Bulk Action Campaign', zeroText],
-                ['#14b8a6', 'Email sequences', zeroText],
-                ['#687291', 'All Campaigns', workflowText],
-            ].map(([color, name, text]) => `
-                <div class="mt-1 flex items-start gap-1.5">
-                    <span class="mt-1 h-2 w-2 shrink-0 rounded-full" style="background-color: ${color}"></span>
-                    <span><span class="font-semibold">${escapeHtml(name)}:</span> ${escapeHtml(text)}</span>
-                </div>
-            `).join('');
-
-            tooltip.innerHTML = `<div class="font-semibold">Date: ${escapeHtml(point.label || point.date || '')}</div>${rowsHtml}`;
-            tooltip.classList.remove('hidden');
-
-            const wrapRect = chartWrap.getBoundingClientRect();
-            const tooltipWidth = tooltip.offsetWidth || 260;
-            const tooltipHeight = tooltip.offsetHeight || 120;
-            const left = Math.min(Math.max(event.clientX - wrapRect.left + 12, 8), Math.max(wrapRect.width - tooltipWidth - 8, 8));
-            const top = Math.min(Math.max(event.clientY - wrapRect.top - tooltipHeight - 12, 8), Math.max(wrapRect.height - tooltipHeight - 8, 8));
-
-            tooltip.style.left = `${left}px`;
-            tooltip.style.top = `${top}px`;
-        };
-
         card.querySelectorAll('[data-email-metric-option]').forEach((option) => {
             option.addEventListener('click', (event) => {
                 event.preventDefault();
@@ -688,14 +575,6 @@ const initializeEmailMetricControls = () => {
             });
         });
 
-        svg?.addEventListener('mousemove', renderTooltip);
-        svg?.addEventListener('mouseleave', () => {
-            tooltip?.classList.add('hidden');
-            pointLayer?.querySelectorAll('[data-email-point]').forEach((pointElement) => {
-                pointElement.setAttribute('r', '4');
-                pointElement.setAttribute('opacity', '1');
-            });
-        });
         renderMetric(state.active || 'open_rate', false);
     });
 };
