@@ -24,20 +24,15 @@ class GhlDashboardController extends Controller
             'from' => $request->date('from')?->toDateString(),
             'to' => $request->date('to')?->toDateString(),
         ];
-        $emailStatsRange = [
-            'from' => $request->date('email_from')?->toDateString(),
-            'to' => $request->date('email_to')?->toDateString(),
-        ];
         $dashboard = $campaignDashboard->build(dateRange: $dateRange);
 
         return view('dashboards.company-campaign-control', $viewData->make(
             dashboard: $dashboard,
             dateRange: $dateRange,
-            emailStats: $emailStats->dashboardState($emailStatsRange),
+            emailStats: $emailStats->dashboardState([]),
             googleCalendar: $googleCalendar->dashboardState($request, $dateRange),
             syncStatus: $syncStatus->summary(),
         ));
     }
 }
-
 

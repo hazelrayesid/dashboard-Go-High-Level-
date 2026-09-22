@@ -254,12 +254,12 @@ class GhlDashboardTest extends TestCase
             ]),
         ]);
 
-        $response = $this->get('/?email_from=2026-09-15&email_to=2026-09-20');
+        $response = $this->get('/');
 
         $response
             ->assertOk()
             ->assertSee('Performance Analysis')
-            ->assertSee('Open Rate (for All Campaigns)')
+            ->assertSee('Open Rate by selected workflow')
             ->assertSee('58,927')
             ->assertSee('2,289')
             ->assertSee('17.41%')
@@ -299,7 +299,7 @@ class GhlDashboardTest extends TestCase
             ]),
         ]);
 
-        $response = $this->get('/?email_from=2026-09-16&email_to=2026-09-21');
+        $response = $this->get('/');
 
         $response
             ->assertOk()
