@@ -8,22 +8,10 @@ use Illuminate\Support\Facades\Cache;
 
 class GhlEmailStatsService
 {
-    private const FOCUSED_WORKFLOW_NAMES = [
-        'Followup after open - website demo',
-        'Top4 Signup - Has Website - Styled',
-        'Top4 Signup - No Website - Styled',
-        'Top4 Signup - No Website - Plain',
-        'No Website - Plain',
-        'Followup after open',
-        'Has Website - Plain',
-        'Has Website - Styled',
-        'No Website - Styled',
-        'Top4 Signup - Has Website - Plain',
-    ];
-
     public function __construct(
         private readonly GhlEmailStatsClient $client,
         private readonly GhlEmailStatsStateBuilder $stateBuilder,
+        private readonly GhlEmailWorkflowSelectionRepository $workflowSelection,
     ) {}
 
     public function dashboardState(array $range): array
@@ -38,42 +26,60 @@ class GhlEmailStatsService
             ]);
         }
 
+        $this->client->startBudget((int) config('services.ghl.email_stats_budget'));
+        $campaignsResult = $this->workflowCampaigns();
+
+        if ($campaignsResult['ok']) {
+            $this->workflowSelection->syncFromCampaigns($campaignsResult['campaigns']);
+        }
+
+        $workflowOptions = $this->workflowSelection->options();
+        $selectedWorkflows = $this->workflowSelection->selectedCampaigns();
+        $selectedNames = $this->workflowSelection->selectedNames();
+
+        if (! $campaignsResult['ok'] && $selectedWorkflows === []) {
+            return array_merge($empty, [
+                'available' => false,
+                'error' => $campaignsResult['error'],
+                'workflow_options' => $workflowOptions,
+            ]);
+        }
+
         $cacheKey = 'ghl:email-stats:'.hash('sha256', json_encode([
             'base_url' => config('services.ghl.base_url'),
             'location_id' => config('services.ghl.location_id'),
             'version' => config('services.ghl.email_stats_version'),
             'range' => $window,
-            'workflow_names' => self::FOCUSED_WORKFLOW_NAMES,
+            'selected' => $this->workflowSelection->selectionFingerprint(),
         ]));
 
-        return Cache::remember($cacheKey, now()->addMinute(), function () use ($window, $empty): array {
-            $this->client->startBudget((int) config('services.ghl.email_stats_budget'));
-
-            return $this->stateBuilder->build($this->focusedWorkflowStatsItems($window), $empty, self::FOCUSED_WORKFLOW_NAMES);
+        $state = Cache::remember($cacheKey, now()->addMinute(), function () use ($window, $empty, $selectedWorkflows, $selectedNames): array {
+            return $this->stateBuilder->build($this->workflowStatsItems($selectedWorkflows, $window), $empty, $selectedNames);
         });
+
+        return array_merge($state, [
+            'workflow_options' => $workflowOptions,
+            'selected_workflows_count' => count($selectedWorkflows),
+            'workflow_list_available' => $campaignsResult['ok'],
+        ]);
     }
 
-    private function focusedWorkflowStatsItems(array $window): array
+    /**
+     * @param  array<int, array<string, mixed>>  $workflows
+     */
+    private function workflowStatsItems(array $workflows, array $window): array
     {
-        $campaignsResult = $this->focusedWorkflowCampaigns();
-
-        if (! $campaignsResult['ok']) {
-            return ['ok' => false, 'items' => [], 'error' => $campaignsResult['error']];
-        }
-
-        $workflows = $this->focusedWorkflows($campaignsResult['campaigns']);
-
-        if ($workflows->isEmpty()) {
+        if ($workflows === []) {
             return ['ok' => true, 'items' => [], 'error' => null, 'complete' => true];
         }
 
         return [
             'ok' => true,
-            'items' => $workflows
+            'items' => collect($workflows)
                 ->map(fn (array $workflow): array => $this->workflowSummaryStatsItem($workflow, $window))
                 ->values()
                 ->all(),
-            'breakdown_placeholders' => $workflows
+            'breakdown_placeholders' => collect($workflows)
                 ->map(fn (array $workflow): array => $this->emptyWorkflowBreakdownRow($workflow))
                 ->values()
                 ->all(),
@@ -82,7 +88,7 @@ class GhlEmailStatsService
         ];
     }
 
-    private function focusedWorkflowCampaigns(): array
+    private function workflowCampaigns(): array
     {
         $campaigns = [];
 
@@ -104,21 +110,6 @@ class GhlEmailStatsService
                 ->all(),
             'error' => null,
         ];
-    }
-
-    private function focusedWorkflows(array $campaigns)
-    {
-        $focusNames = collect(self::FOCUSED_WORKFLOW_NAMES)
-            ->mapWithKeys(fn (string $name): array => [strtolower($name) => true]);
-
-        return collect($campaigns)
-            ->filter(fn (array $campaign): bool => $focusNames->has(strtolower((string) Arr::get($campaign, 'name'))))
-            ->sortBy(function (array $campaign): int {
-                $position = array_search((string) Arr::get($campaign, 'name'), self::FOCUSED_WORKFLOW_NAMES, true);
-
-                return $position === false ? 999 : $position;
-            })
-            ->values();
     }
 
     private function workflowSummaryStatsItem(array $workflow, array $window): array
