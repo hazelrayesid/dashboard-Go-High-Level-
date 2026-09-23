@@ -22,8 +22,8 @@
 
                 <div class="grid gap-4 px-3 pb-16 pt-4 sm:gap-6 sm:px-6 sm:py-6 lg:px-8">
                     @include('dashboards.company-campaign-control.sync-alert')
-                    @include('dashboards.company-campaign-control.summary')
                     @include('dashboards.company-campaign-control.email-open-rate')
+                    @include('dashboards.company-campaign-control.summary')
                     @include('dashboards.company-campaign-control.segments')
                     @include('dashboards.company-campaign-control.google-calendar')
                     @include('dashboards.company-campaign-control.company-queue')
