@@ -443,6 +443,27 @@ const initializeDateControls = () => {
     });
 };
 
+const closeOpenDetails = (event = null) => {
+    document.querySelectorAll('details[open]').forEach((details) => {
+        if (event?.target && details.contains(event.target)) {
+            return;
+        }
+
+        details.removeAttribute('open');
+    });
+};
+
+const initializeDetailsAutoClose = () => {
+    window.addEventListener('scroll', () => closeOpenDetails(), { passive: true });
+    window.addEventListener('resize', () => closeOpenDetails(), { passive: true });
+
+    document.querySelector('[data-dashboard-scroll]')?.addEventListener('scroll', () => closeOpenDetails(), { passive: true });
+
+    document.addEventListener('click', (event) => {
+        closeOpenDetails(event);
+    });
+};
+
 const initializeEmailMetricControls = () => {
     const formatter = new Intl.NumberFormat('en-US');
 
@@ -684,5 +705,6 @@ initializeCalendarInteractions();
 initializeEmailMatchDialog();
 initializeDashboardHorizontalScroll();
 initializeDateControls();
+initializeDetailsAutoClose();
 initializeEmailMetricControls();
 initializeEmailBreakdownPagination();
