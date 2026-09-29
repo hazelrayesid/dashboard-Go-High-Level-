@@ -600,59 +600,6 @@ const initializeEmailMetricControls = () => {
     });
 };
 
-const initializeEmailRangeControls = () => {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric',
-    });
-
-    document.querySelectorAll('[data-email-range-form]').forEach((form) => {
-        if (form.dataset.rangeBound === 'true') {
-            return;
-        }
-
-        form.dataset.rangeBound = 'true';
-
-        const rangeInputs = () => form.querySelectorAll('input[name="email_from"], input[name="email_to"]');
-
-        form.querySelectorAll('[data-email-range-shell]').forEach((shell) => {
-            const input = shell.querySelector('[data-email-range-input]');
-            const button = shell.querySelector('[data-email-range-button]');
-            const label = shell.querySelector('[data-email-range-label]');
-            const fallback = input?.name === 'email_to' ? 'To' : 'From';
-
-            if (! input || ! button || ! label) {
-                return;
-            }
-
-            const updateLabel = () => {
-                label.textContent = input.value
-                    ? formatter.format(new Date(`${input.value}T00:00:00`))
-                    : fallback;
-            };
-
-            button.addEventListener('click', () => {
-                if (typeof input.showPicker === 'function') {
-                    input.showPicker();
-                    return;
-                }
-
-                input.click();
-            });
-
-            input.addEventListener('change', updateLabel);
-            updateLabel();
-        });
-
-        form.addEventListener('submit', () => {
-            rangeInputs().forEach((input) => {
-                input.disabled = ! input.value;
-            });
-        });
-    });
-};
-
 const initializeEmailBreakdownPagination = () => {
     const pageSize = 5;
 
@@ -760,5 +707,4 @@ initializeDashboardHorizontalScroll();
 initializeDateControls();
 initializeDetailsAutoClose();
 initializeEmailMetricControls();
-initializeEmailRangeControls();
 initializeEmailBreakdownPagination();
