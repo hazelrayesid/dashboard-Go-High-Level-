@@ -63,6 +63,10 @@
     $activeMetric = $metricOptions[$activeMetricKey];
     $isRateMetric = $activeMetric['unit'] === '%';
     $metricBaseQuery = request()->except(['email_metric', 'email_from', 'email_to']);
+    $emailRange = $emailStats['range'] ?? ['from' => null, 'to' => null];
+    $emailRangeFrom = request('email_from', $emailRange['from'] ?? null);
+    $emailRangeTo = request('email_to', $emailRange['to'] ?? null);
+    $hasEmailRange = request()->filled('email_from') || request()->filled('email_to');
     $workflowOptions = collect($emailStats['workflow_options'] ?? []);
     $selectedWorkflowCount = (int) ($emailStats['selected_workflows_count'] ?? $workflowOptions->where('enabled', true)->count());
     $chartBreakdown = $emailBreakdown

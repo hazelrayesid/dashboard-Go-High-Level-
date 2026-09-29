@@ -24,13 +24,37 @@
                 @endif
             </div>
 
-            <div class="grid gap-2 lg:justify-items-end">
+            <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-start sm:justify-end lg:w-auto">
                 {{-- <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
                     Snapshot summary from selected workflows. Refreshed from HighLevel every minute.
                 </div> --}}
 
+                <form method="GET" action="{{ route('dashboard') }}" data-email-range-form class="flex h-10 w-full min-w-0 items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:w-auto">
+                    @foreach (request()->query() as $key => $value)
+                        @if (is_scalar($value) && ! in_array($key, ['email_from', 'email_to'], true))
+                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                        @endif
+                    @endforeach
+                    <span data-email-range-shell class="relative flex h-10 w-[8.5rem] min-w-0 items-center">
+                        <label class="sr-only" for="email_from">Email stats from</label>
+                        <input id="email_from" data-email-range-input type="date" name="email_from" value="{{ $emailRangeFrom }}" class="pointer-events-none absolute left-2 top-1/2 h-px w-px -translate-y-1/2 opacity-0 dark:[color-scheme:dark]">
+                        <button type="button" data-email-range-button class="h-10 w-full truncate px-3 text-left text-xs font-semibold text-slate-800 outline-none hover:bg-slate-50 focus:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-900 dark:focus:bg-slate-900">
+                            <span data-email-range-label>{{ $emailRangeFrom ? \Carbon\CarbonImmutable::parse($emailRangeFrom)->format('m/d/Y') : 'From' }}</span>
+                        </button>
+                    </span>
+                    <span class="shrink-0 text-xs font-medium text-slate-400 dark:text-slate-500">to</span>
+                    <span data-email-range-shell class="relative flex h-10 w-[8.5rem] min-w-0 items-center">
+                        <label class="sr-only" for="email_to">Email stats to</label>
+                        <input id="email_to" data-email-range-input type="date" name="email_to" value="{{ $emailRangeTo }}" class="pointer-events-none absolute left-2 top-1/2 h-px w-px -translate-y-1/2 opacity-0 dark:[color-scheme:dark]">
+                        <button type="button" data-email-range-button class="h-10 w-full truncate px-3 text-left text-xs font-semibold text-slate-800 outline-none hover:bg-slate-50 focus:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-900 dark:focus:bg-slate-900">
+                            <span data-email-range-label>{{ $emailRangeTo ? \Carbon\CarbonImmutable::parse($emailRangeTo)->format('m/d/Y') : 'To' }}</span>
+                        </button>
+                    </span>
+                    <button type="submit" class="h-10 shrink-0 bg-slate-950 px-4 text-xs font-semibold text-white hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-500/20 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200">Apply</button>
+                </form>
+
                 @if ($workflowOptions->isNotEmpty())
-                    <details class="group relative w-full sm:w-[460px]">
+                    <details class="group relative w-full sm:w-[360px] xl:w-[460px]">
                         <summary class="flex h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm outline-none hover:border-slate-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:focus:ring-blue-500/10">
                             <span>{{ number_format($selectedWorkflowCount) }} workflow campaign{{ $selectedWorkflowCount === 1 ? '' : 's' }} selected</span>
                             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" class="h-4 w-4 text-slate-400 dark:text-slate-500">
@@ -40,7 +64,7 @@
                         <form method="POST" action="{{ route('ghl.email-workflows.update') }}" class="absolute right-0 z-30 mt-1 w-full overflow-hidden rounded-md border border-slate-200 bg-white text-sm text-slate-700 shadow-xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
                             @csrf
                             @foreach (request()->query() as $key => $value)
-                                @if (is_scalar($value) && ! in_array($key, ['email_from', 'email_to'], true))
+                                @if (is_scalar($value))
                                     <input type="hidden" name="{{ $key }}" value="{{ $value }}">
                                 @endif
                             @endforeach
