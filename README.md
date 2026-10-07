@@ -71,3 +71,6 @@ mkdir dashboard ghl
 docker run --rm -it -v ${PWD}:/app -w /app composer:latest create-project laravel/laravel .
 
 docker run --rm -it -v ${PWD}:/app -w /app -p 8000:8000 php:zts-alpine3.23 php artisan serve --host=0.0.0.0 --port=8000
+
+
+ https://www.top4marketing.com.au/employment-agreement/
