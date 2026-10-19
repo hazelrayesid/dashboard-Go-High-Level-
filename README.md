@@ -74,3 +74,10 @@ docker run --rm -it -v ${PWD}:/app -w /app -p 8000:8000 php:zts-alpine3.23 php a
 
 
  https://www.top4marketing.com.au/employment-agreement/
+
+
+Mengembangkan dashboard untuk mengambil dan menganalisis ratusan ribu data kontak serta aktivitas email marketing dari GoHighLevel, dengan segmentasi prospek dan perbandingan performa kampanye berdasarkan Open Rate, Click Rate, Email Delivered, Bounced, Unsubscribed, dan Spam Complaints guna membantu perusahaan mengevaluasi efektivitas kampanye, kualitas audiens, serta prioritas tindak lanjut.
+
+Mengintegrasikan Google Calendar untuk mencocokkan alamat email kontak GoHighLevel dengan jadwal peserta meeting guna mengidentifikasi konversi prospek menjadi pertemuan, dengan akses koneksi kalender terbatas pada akun berdomain perusahaan sesuai kebijakan OAuth.
+
+Mengembangkan AI Receptionist dengan integrasi 3CX, Retell AI, dan Twilio untuk mengarahkan panggilan masuk berdasarkan pencocokan nomor telepon dengan database klien; penelepon baru dilayani AI Receptionist dengan knowledge base company, sedangkan klien terdaftar diteruskan ke staf kantor melalui 3CX guna mengotomatisasi penerimaan panggilan dan menjaga akses langsung klien ke layanan manusia.
