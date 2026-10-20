@@ -81,3 +81,6 @@ Mengembangkan dashboard untuk mengambil dan menganalisis ratusan ribu data konta
 Mengintegrasikan Google Calendar untuk mencocokkan alamat email kontak GoHighLevel dengan jadwal peserta meeting guna mengidentifikasi konversi prospek menjadi pertemuan, dengan akses koneksi kalender terbatas pada akun berdomain perusahaan sesuai kebijakan OAuth.
 
 Mengembangkan AI Receptionist (Inbound Caller) dengan integrasi 3CX, Retell AI, dan Twilio untuk mengarahkan panggilan masuk berdasarkan pencocokan nomor telepon dengan database klien; penelepon baru dilayani AI Receptionist dengan knowledge base company, sedangkan klien terdaftar diteruskan ke staf kantor melalui 3CX guna mengotomatisasi penerimaan panggilan dan menjaga akses langsung klien ke layanan manusia.
+
+
+Researched, qualified and enriched 670+ Australian and New Zealand SMB prospects from GoHighLevel CRM exports, verifying each through ABN Lookup and website audits and scoring them with a tiered framework (60 high-intent Tier 1 accounts). Identified decision makers and turned website issues (expired domains, broken SSL, missing booking funnels) into tailored sales pitches for cold outreach.
