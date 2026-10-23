@@ -84,3 +84,6 @@ Mengembangkan AI Receptionist (Inbound Caller) dengan integrasi 3CX, Retell AI, 
 
 
 Researched, qualified and enriched 670+ Australian and New Zealand SMB prospects from GoHighLevel CRM exports, verifying each through ABN Lookup and website audits and scoring them with a tiered framework (60 high-intent Tier 1 accounts). Identified decision makers and turned website issues (expired domains, broken SSL, missing booking funnels) into tailored sales pitches for cold outreach.
+
+
+https://ayoostore.id/ ada vuln html injection di search barnya (<marquee>Berhasil html injection</marquee>)
