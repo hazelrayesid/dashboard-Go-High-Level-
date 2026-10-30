@@ -52,6 +52,25 @@ const setActiveFilter = (filter) => {
     document.querySelectorAll('[data-filter-button]').forEach((button) => {
         button.dataset.active = String(button.dataset.filterButton === filter);
     });
+
+    window.requestAnimationFrame(syncFilterNavIndicators);
+};
+
+const syncFilterNavIndicators = () => {
+    document.querySelectorAll('[data-filter-nav]').forEach((nav) => {
+        const activeButton = nav.querySelector('[data-filter-button][data-active="true"]');
+        const indicator = nav.querySelector('[data-filter-indicator]');
+
+        if (! activeButton || ! indicator) {
+            return;
+        }
+
+        const inset = 10;
+
+        indicator.style.width = `${Math.max(activeButton.offsetWidth - (inset * 2), 16)}px`;
+        indicator.style.transform = `translateX(${activeButton.offsetLeft + inset}px)`;
+        indicator.dataset.ready = 'true';
+    });
 };
 
 const applyFilter = (filter) => {
@@ -699,6 +718,7 @@ document.querySelectorAll('[data-copy-value]').forEach((button) => {
 });
 
 applyFilter('all');
+window.addEventListener('resize', syncFilterNavIndicators);
 applyTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 setSidebarCollapsed(window.matchMedia('(min-width: 1280px)').matches && window.localStorage.getItem('companyDashboard.sidebarCollapsed') === 'true');
 initializeCalendarInteractions();

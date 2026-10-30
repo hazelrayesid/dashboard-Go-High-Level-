@@ -5,16 +5,17 @@
             <h2 class="mt-1 text-xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-2xl">Campaign workspace</h2>
         </div>
 
-        <div class="flex items-center gap-2 pb-1">
-            <div class="flex rounded-md border border-slate-200 bg-slate-100 p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-label="Quick filters">
+        <div class="flex items-center gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav data-filter-nav class="filter-nav flex shrink-0 items-center gap-1" aria-label="Quick filters">
                 @foreach ($filterOptions as $option)
-                    <button type="button" data-filter-button="{{ $option['filter'] }}" class="shrink-0 rounded-[5px] px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-950 data-[active=true]:bg-slate-950 data-[active=true]:text-white data-[active=true]:shadow-sm dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:data-[active=true]:bg-white dark:data-[active=true]:text-slate-950 sm:px-3.5 sm:py-2 sm:text-sm" @if ($option['filter'] === 'all') data-active="true" @endif>
+                    <button type="button" data-filter-button="{{ $option['filter'] }}" class="shrink-0 px-2.5 py-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-950 data-[active=true]:text-slate-950 dark:text-slate-400 dark:hover:text-white dark:data-[active=true]:text-white sm:px-3 sm:text-sm" @if ($option['filter'] === 'all') data-active="true" @endif>
                         {{ $option['label'] }}
                     </button>
                 @endforeach
-            </div>
+                <span data-filter-indicator class="filter-nav-indicator" aria-hidden="true"></span>
+            </nav>
 
-            <button type="button" data-theme-toggle aria-label="Toggle theme" title="Toggle theme" class="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-teal-300 hover:text-teal-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-500 dark:hover:text-teal-300">
+            <button type="button" data-theme-toggle aria-label="Toggle theme" title="Toggle theme" class="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
                 <svg data-theme-light-icon viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="4"/>
                     <path d="M12 2v2"/>
